@@ -4,12 +4,18 @@ import string
 
 
 def xor_data(key, data):
+    if len(key) == 1:
+        #shortcut
+        key = ord(key)
+        return ''.join(chr(ord(x) ^ key) for x in data)
+
     stream = itertools.cycle(key)
     return ''.join(chr(ord(x) ^ ord(y)) for x,y in itertools.izip(data, stream))
 
 
+
+ok = set(string.letters + ' ')
 def score_ratio(s):
-    ok = set(string.letters + ' ')
     lcount = sum(1 for x in s if x in ok)
     return lcount / float(len(s))
 
@@ -97,8 +103,25 @@ Tune your algorithm until this works.
 
 
 def cc4():
-    """"""
-    pass
+    """4. Detect single-character XOR
+
+One of the 60-character strings at:
+
+ https://gist.github.com/3132713
+
+has been encrypted by single-character XOR. Find it. (Your code from
+#3 should help.)
+"""
+    keys = [chr(x) for x in xrange(256)]
+    best_scores = []
+    with open('data/cc4.txt') as f:
+        for line in f:
+            ciphertext = line.strip().decode('hex')
+            scores = score_decodings(keys, score_ratio, ciphertext)
+            best_scores.append(scores[0])
+    best = sorted(best_scores, reverse=True)[0]
+    print "score: %.2f key: '%s' plain: %s" % best
+
 
 def cc5():
     """"""
@@ -122,5 +145,4 @@ if __name__ == '__main__':
         print f.__doc__.split('\n')[0]
         f()
         print
-
 
