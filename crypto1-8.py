@@ -5,6 +5,7 @@ import string
 from Crypto.Cipher import AES
 
 def xor_data(key, data):
+    "xor key with data, repeating key as necessary"
     if len(key) == 1:
         #shortcut
         key = ord(key)
@@ -16,11 +17,13 @@ def xor_data(key, data):
 
 ok = set(string.letters + ' ')
 def score_ratio(s):
-    lcount = sum(1 for x in s if x in ok)
-    return lcount / float(len(s))
+    "ratio of letters+space to total length"
+    count = sum(1 for x in s if x in ok)
+    return count / float(len(s))
 
 
 def score_decodings(keys, fscore, data):
+    "return list of decodings, scored by fscore"
     scores = []
     for key in keys:
         plain = xor_data(key, data)
@@ -50,14 +53,13 @@ def mean(lst):
 
 
 def hamming(s1, s2):
-    #count bits that are different (xor == 1)
+    "count bits that are different (i.e. xor == 1)"
     return sum(bin(ord(x) ^ ord(y)).count('1') for x,y in zip(s1, s2))
 
 
 def gen_distances(maxlen, blockcount, fdist, ciphertext):
+    "for each keysize, yield mean of distances for first blockcount blocks"
     for keysize in xrange(1, maxlen+1):
-        #s1, s2 = ciphertext[:keysize], ciphertext[keysize:keysize*2]
-        #yield fdist(s1, s2) / float(keysize), keysize
         blocks = list(grouper(keysize, ciphertext))
         distances = [fdist(s1, s2) / float(keysize) for s1, s2 in pairwise(blocks[:blockcount])]
         yield mean(distances), keysize
@@ -240,15 +242,16 @@ block. Put them together and you have the key.
     distances = sorted(gen_distances(40, 5, hamming, ciphertext))
     #print distances[:4]
     #[(2.25, 2), (2.5999999999999996, 5), (2.818965517241379, 29), (2.8333333333333335, 3)]
-    #tried manually - 29 wins
+    #tried first few manually - 29 wins
+    #zip(*matrix) will transpose
     blocks = zip(*grouper(29, ciphertext, '\00'))
     blocks = [''.join(block) for block in blocks]
     keys = [chr(x) for x in xrange(256)]
 
     key = []
     for block in blocks:
-        score = score_decodings(keys, score_ratio, block)[0]
-        key.append(score[1])
+        best = score_decodings(keys, score_ratio, block)[0]
+        key.append(best[1])
 
     key = ''.join(key)
     print xor_data(key, ciphertext)
@@ -294,18 +297,13 @@ the same 16 byte ciphertext.
 """
     with open('data/cc8.txt') as f:
         for i, line in enumerate(f):
-            ciphertext = line.strip().decode('hex')
-            blocks = grouper(16, ciphertext, '\00')
+            blocks = grouper(16, line.strip().decode('hex'))
             blockset = set()
             for block in blocks:
                 if block in blockset:
                     print 'ECB in line %d: %s...' % (i+1, line[:64])
                     break
                 blockset.add(block)
-
-
-
-
 
 
 if __name__ == '__main__':
