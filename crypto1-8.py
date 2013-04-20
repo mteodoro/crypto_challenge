@@ -150,7 +150,7 @@ has been encrypted by single-character XOR. Find it. (Your code from
 """
     keys = [chr(x) for x in xrange(256)]
     best_scores = []
-    with open('data/cc4.txt') as f:
+    with open('data/cc04.txt') as f:
         for line in f:
             ciphertext = line.strip().decode('hex')
             scores = score_decodings(keys, score_ratio, ciphertext)
@@ -235,7 +235,7 @@ e. For each block, the single-byte XOR key that produces the best
 looking histogram is the repeating-key XOR key byte for that
 block. Put them together and you have the key.
 """
-    with open('data/cc6.txt') as f:
+    with open('data/cc06.txt') as f:
         ciphertext = f.read().decode('base64')
 
     #print hamming('this is a test', 'wokka wokka!!!') == 37
@@ -277,7 +277,7 @@ Easiest way:
 
 Use OpenSSL::Cipher and give it AES-128-ECB as the cipher.
 """
-    with open('data/cc7.txt') as f:
+    with open('data/cc07.txt') as f:
         ciphertext = f.read().decode('base64')
     print AES.new("YELLOW SUBMARINE", mode=AES.MODE_ECB).decrypt(ciphertext)
 
@@ -295,7 +295,7 @@ Remember that the problem with ECB is that it is stateless and
 deterministic; the same 16 byte plaintext block will always produce
 the same 16 byte ciphertext.
 """
-    with open('data/cc8.txt') as f:
+    with open('data/cc08.txt') as f:
         for i, line in enumerate(f):
             blocks = grouper(16, line.strip().decode('hex'))
             blockset = set()
