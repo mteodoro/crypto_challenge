@@ -280,8 +280,32 @@ Use OpenSSL::Cipher and give it AES-128-ECB as the cipher.
 
 
 def cc8():
-    """"""
-    pass
+    """8. Detecting ECB
+
+At the following URL are a bunch of hex-encoded ciphertexts:
+
+  https://gist.github.com/3132928
+
+One of them is ECB encrypted. Detect it.
+
+Remember that the problem with ECB is that it is stateless and
+deterministic; the same 16 byte plaintext block will always produce
+the same 16 byte ciphertext.
+"""
+    with open('data/cc8.txt') as f:
+        for i, line in enumerate(f):
+            ciphertext = line.strip().decode('hex')
+            blocks = grouper(16, ciphertext, '\00')
+            blockset = set()
+            for block in blocks:
+                if block in blockset:
+                    print 'ECB in line %d: %s...' % (i+1, line[:64])
+                    break
+                blockset.add(block)
+
+
+
+
 
 
 if __name__ == '__main__':
