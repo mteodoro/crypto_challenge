@@ -2,6 +2,13 @@
 import itertools
 
 
+def pkcs7_pad(blocklen, data):
+    padlen = blocklen - len(data) % blocklen
+    if padlen == blocklen:
+        return data
+    return data + chr(padlen) * padlen
+
+
 def cc9():
     """9. Implement PKCS#7 padding
 
@@ -16,6 +23,7 @@ padded to 20 bytes would be:
 
 The particulars of this algorithm are easy to find online.
 """
+    print repr(pkcs7_pad(20, "YELLOW SUBMARINE"))
 
 
 def cc10():
