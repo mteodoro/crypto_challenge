@@ -28,6 +28,40 @@ def score_decodings(keys, fscore, data):
     return sorted(scores, reverse=True)
 
 
+#http://docs.python.org/2/library/itertools.html#recipes
+def grouper(n, iterable, fillvalue=None):
+    "Collect data into fixed-length chunks or blocks"
+    # grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx
+    args = [iter(iterable)] * n
+    return itertools.izip_longest(fillvalue=fillvalue, *args)
+
+
+def pairwise(iterable):
+    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    a, b = itertools.tee(iterable)
+    next(b, None)
+    return itertools.izip(a, b)
+
+
+def mean(lst):
+    """mean(lst) -> the arithmetic mean of the values in LST"""
+    return sum(lst) / float(len(lst))
+
+
+def hamming(s1, s2):
+    #count bits that are different (xor == 1)
+    return sum(bin(ord(x) ^ ord(y)).count('1') for x,y in zip(s1, s2))
+
+
+def gen_distances(maxlen, blockcount, fdist, ciphertext):
+    for keysize in xrange(1, maxlen+1):
+        #s1, s2 = ciphertext[:keysize], ciphertext[keysize:keysize*2]
+        #yield fdist(s1, s2) / float(keysize), keysize
+        blocks = list(grouper(keysize, ciphertext))
+        distances = [fdist(s1, s2) / float(keysize) for s1, s2 in pairwise(blocks[:blockcount])]
+        yield mean(distances), keysize
+
+
 def cc1():
     """1. Convert hex to base64 and back.
 
@@ -143,16 +177,82 @@ feel for it.
 I go crazy when I hear a cymbal"""
 
     cipher = xor_data('ICE', plain).encode('hex')
-    print 'ICE: %s...' % cipher[:64]
     print 'Match' if cipher == output else 'No Match'
-    print
-    print 'BABY: %s...' % xor_data('BABY', plain).encode('hex')[:64]
-    print 'FOREVER: %s...' % xor_data('FOREVER', plain).encode('hex')[:64]
+    print 'ICE: %s...' % cipher[:64]
+    for key in ('BABY', 'FOREVER'):
+        print '%s: %s...' % (key, xor_data(key, plain).encode('hex')[:64])
 
 
 def cc6():
-    """"""
-    pass
+    """6. Break repeating-key XOR
+
+The buffer at the following location:
+
+https://gist.github.com/3132752
+
+is base64-encoded repeating-key XOR. Break it.
+
+Here's how:
+
+a. Let KEYSIZE be the guessed length of the key; try values from 2 to
+(say) 40.
+
+b. Write a function to compute the edit distance/Hamming distance
+between two strings. The Hamming distance is just the number of
+differing bits. The distance between:
+
+ this is a test
+
+and:
+
+ wokka wokka!!!
+
+is 37.
+
+c. For each KEYSIZE, take the FIRST KEYSIZE worth of bytes, and the
+SECOND KEYSIZE worth of bytes, and find the edit distance between
+them. Normalize this result by dividing by KEYSIZE.
+
+d. The KEYSIZE with the smallest normalized edit distance is probably
+the key. You could proceed perhaps with the smallest 2-3 KEYSIZE
+values. Or take 4 KEYSIZE blocks instead of 2 and average the
+distances.
+
+e. Now that you probably know the KEYSIZE: break the ciphertext into
+blocks of KEYSIZE length.
+
+f. Now transpose the blocks: make a block that is the first byte of
+every block, and a block that is the second byte of every block, and
+so on.
+
+g. Solve each block as if it was single-character XOR. You already
+have code to do this.
+
+e. For each block, the single-byte XOR key that produces the best
+looking histogram is the repeating-key XOR key byte for that
+block. Put them together and you have the key.
+"""
+    with open('data/cc6.txt') as f:
+        ciphertext = f.read().decode('base64')
+
+    #print hamming('this is a test', 'wokka wokka!!!') == 37
+    distances = sorted(gen_distances(40, 5, hamming, ciphertext))
+    #print distances[:4]
+    #[(2.25, 2), (2.5999999999999996, 5), (2.818965517241379, 29), (2.8333333333333335, 3)]
+    #tried manually - 29 wins
+    blocks = zip(*grouper(29, ciphertext, '\00'))
+    blocks = [''.join(block) for block in blocks]
+    keys = [chr(x) for x in xrange(256)]
+
+    key = []
+    for block in blocks:
+        score = score_decodings(keys, score_ratio, block)[0]
+        key.append(score[1])
+
+    key = ''.join(key)
+    print xor_data(key, ciphertext)
+    print "Key: '%s'" % key
+
 
 def cc7():
     """"""
