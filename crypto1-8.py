@@ -2,6 +2,7 @@
 import itertools
 import string
 
+from Crypto.Cipher import AES
 
 def xor_data(key, data):
     if len(key) == 1:
@@ -255,8 +256,28 @@ block. Put them together and you have the key.
 
 
 def cc7():
-    """"""
-    pass
+    """7. AES in ECB Mode
+
+The Base64-encoded content at the following location:
+
+   https://gist.github.com/3132853
+
+Has been encrypted via AES-128 in ECB mode under the key
+
+   "YELLOW SUBMARINE".
+
+(I like "YELLOW SUBMARINE" because it's exactly 16 bytes long).
+
+Decrypt it.
+
+Easiest way:
+
+Use OpenSSL::Cipher and give it AES-128-ECB as the cipher.
+"""
+    with open('data/cc7.txt') as f:
+        ciphertext = f.read().decode('base64')
+    print AES.new("YELLOW SUBMARINE", mode=AES.MODE_ECB).decrypt(ciphertext)
+
 
 def cc8():
     """"""
