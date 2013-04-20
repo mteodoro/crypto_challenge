@@ -143,8 +143,11 @@ feel for it.
 I go crazy when I hear a cymbal"""
 
     cipher = xor_data('ICE', plain).encode('hex')
-    print '%s...' % cipher[:64]
-    print cipher == output
+    print 'ICE: %s...' % cipher[:64]
+    print 'Match' if cipher == output else 'No Match'
+    print
+    print 'BABY: %s...' % xor_data('BABY', plain).encode('hex')[:64]
+    print 'FOREVER: %s...' % xor_data('FOREVER', plain).encode('hex')[:64]
 
 
 def cc6():
