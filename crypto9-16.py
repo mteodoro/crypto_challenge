@@ -38,6 +38,16 @@ def cbc_decrypt(key, iv, data):
     return ''.join(output)
 
 
+def detect_mode(ciphertext):
+    blocks = grouper(16, ciphertext)
+    blockset = set()
+    for block in blocks:
+        if block in blockset:
+            return AES.MODE_ECB
+        blockset.add(block)
+    return AES.MODE_CBC
+
+
 def cc9():
     """9. Implement PKCS#7 padding
 
@@ -125,15 +135,6 @@ Now detect the block cipher mode the function is using each time.
             iv = random_key(16)
             return mode, AES.new(key, IV=iv, mode=mode).encrypt(pkcs7_pad(16, data))
 
-    def detect_mode(ciphertext):
-        blocks = grouper(16, ciphertext)
-        blockset = set()
-        for block in blocks:
-            if block in blockset:
-                return AES.MODE_ECB
-            blockset.add(block)
-        return AES.MODE_CBC
-
     for i in xrange(10):
         mode, ciphertext = encryption_oracle('A' * 48)
         print i, 'ecb' if mode == AES.MODE_ECB else 'cbc',
@@ -195,6 +196,25 @@ unknown-string.
 
 f. Repeat for the next byte.
 """
+    def encryption_oracle_ecb(key, data):
+        unknown = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK".decode('base64')
+        return AES.new(key, mode=AES.MODE_ECB).encrypt(pkcs7_pad(16, data + unknown))
+
+    key = random_key(16)
+
+    #push ciphertext over into the next block length
+    orig_len = len(encryption_oracle_ecb(key, ''))
+    for i in xrange(1, 128):
+        cur_len = len(encryption_oracle_ecb(key, 'A' * i))
+        if cur_len - orig_len:
+            blocklen = cur_len - orig_len
+            print 'a: Blocklength:', blocklen
+            break
+
+    #detect mode
+    mode = detect_mode(encryption_oracle_ecb(key, 'A' * 48))
+    print 'b: Mode:', 'ecb' if mode == AES.MODE_ECB else 'cbc'
+
 
 
 def cc13():
