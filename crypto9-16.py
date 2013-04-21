@@ -1,7 +1,12 @@
 #!/usr/bin/env python
 import itertools
+import random
 
 from Crypto.Cipher import AES
+
+def random_key(keylen):
+    return ''.join(chr(random.randint(0,255)) for _ in xrange(keylen))
+
 
 def pkcs7_pad(blocklen, data):
     padlen = blocklen - len(data) % blocklen
@@ -106,6 +111,36 @@ rand(2) to decide which to use.
 
 Now detect the block cipher mode the function is using each time.
 """
+    def encryption_oracle(data):
+        key = random_key(16)
+        prefix = random_key(random.randint(5,10))
+        suffix = random_key(random.randint(5,10))
+        data = ''.join((prefix, data, suffix))
+
+        if random.randint(0,1):
+            mode = AES.MODE_ECB
+            return mode, AES.new(key, mode=mode).encrypt(pkcs7_pad(16, data))
+        else:
+            mode = AES.MODE_CBC
+            iv = random_key(16)
+            return mode, AES.new(key, IV=iv, mode=mode).encrypt(pkcs7_pad(16, data))
+
+    def detect_mode(ciphertext):
+        blocks = grouper(16, ciphertext)
+        blockset = set()
+        for block in blocks:
+            if block in blockset:
+                return AES.MODE_ECB
+            blockset.add(block)
+        return AES.MODE_CBC
+
+    for i in xrange(10):
+        mode, ciphertext = encryption_oracle('A' * 48)
+        print i, 'ecb' if mode == AES.MODE_ECB else 'cbc',
+        if mode == detect_mode(ciphertext):
+            print 'Match'
+        else:
+            print 'No Match'
 
 
 def cc12():
