@@ -215,6 +215,25 @@ f. Repeat for the next byte.
     mode = detect_mode(encryption_oracle_ecb(key, 'A' * 48))
     print 'b: Mode:', 'ecb' if mode == AES.MODE_ECB else 'cbc'
 
+    #cipher_blocks = len(encryption_oracle_ecb(key, '')) / blocklen
+    #for block in xrange(cipher_blocks):
+
+    #for i in xrange(1, blocklen + 1):
+    #    block_plain = {}
+    #    blockpad = 'A' * (blocklen - i)
+    #    print len(blockpad), blockpad
+    #    #for c in (chr(x) for x in xrange(256)):
+
+
+    blockpad = 'A' * (blocklen - 1)
+    cipher_block = encryption_oracle_ecb(key, blockpad)[:blocklen]
+    for c in (chr(x) for x in xrange(256)):
+        test_block = encryption_oracle_ecb(key, blockpad + c)[:blocklen]
+        if test_block == cipher_block:
+            print c
+            break
+
+
 
 
 def cc13():
