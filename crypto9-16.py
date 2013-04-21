@@ -1,12 +1,36 @@
 #!/usr/bin/env python
 import itertools
 
+from Crypto.Cipher import AES
 
 def pkcs7_pad(blocklen, data):
     padlen = blocklen - len(data) % blocklen
     if padlen == blocklen:
         return data
     return data + chr(padlen) * padlen
+
+
+def xor_block(b1, b2):
+    return ''.join(chr(ord(x) ^ ord(y)) for x,y in zip(b1, b2))
+
+
+#http://docs.python.org/2/library/itertools.html#recipes
+def grouper(n, iterable, fillvalue=None):
+    "Collect data into fixed-length chunks or blocks"
+    # grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx
+    args = [iter(iterable)] * n
+    return itertools.izip_longest(fillvalue=fillvalue, *args)
+
+
+def cbc_decrypt(key, iv, data):
+    output = []
+    prev_block = iv
+    for block in grouper(len(key), data):
+        block = ''.join(block)
+        x = AES.new(key).decrypt(block)
+        output.append(xor_block(prev_block, x))
+        prev_block = block
+    return ''.join(output)
 
 
 def cc9():
@@ -51,6 +75,10 @@ The buffer at:
 is intelligible (somewhat) when CBC decrypted against "YELLOW
 SUBMARINE" with an IV of all ASCII 0 (\x00\x00\x00 &c)
 """
+    with open('data/cc10.txt') as f:
+        ciphertext = ''.join(line for line in f).decode('base64')
+
+    print cbc_decrypt("YELLOW SUBMARINE", '\x00' * 16, ciphertext)
 
 
 def cc11():
