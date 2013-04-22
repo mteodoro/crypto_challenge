@@ -301,11 +301,36 @@ profile.
 
     profile = profile_for("foo@bar.com")
     print 'Encoded:', profile
+    print
+
+    def encryption_oracle(key, email):
+        profile = profile_for(email)
+        return AES.new(key, mode=AES.MODE_ECB).encrypt(pkcs7_pad(16, profile))
 
     key = random_key(16)
-    ciphertext = AES.new(key, mode=AES.MODE_ECB).encrypt(pkcs7_pad(16, profile))
-    print repr(ciphertext)
 
+    print "Step 1: 13-byte email forces 2nd block to end with '&role='"
+    print profile_for('vanil@ice.com')
+    print '^' * 32
+    cipher = encryption_oracle(key, 'vanil@ice.com')[:32]
+
+    print
+    print "Step 2: Create 3rd block that starts with 'admin'"
+    print profile_for('XXXXXXXXXX' + 'admin')
+    print ' ' * 15, '^' * 16
+    cipher += encryption_oracle(key, 'XXXXXXXXXX' + 'admin')[16:32]
+
+    print
+    print "Step 3: Create 4th block for proper decoding resulting in junk 'rolemail' key"
+    print profile_for('XXXXXXXXXX')
+    print '^' * 16
+    cipher += encryption_oracle(key, 'XXXXXXXXXX')[:16]
+
+    plain = AES.new(key, mode=AES.MODE_ECB).decrypt(cipher)
+    print
+    print 'Decrypted:', plain
+    print 'Parsed:', kvparse(plain)
+    print
 
 
 def cc14():
