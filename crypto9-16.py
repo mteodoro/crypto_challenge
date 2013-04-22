@@ -49,6 +49,17 @@ def detect_mode(ciphertext):
     return AES.MODE_CBC
 
 
+def detect_blocklen(fcrypt):
+    #push ciphertext over into the next block length
+    orig_len = len(fcrypt(''))
+    for i in xrange(1, 128):
+        cur_len = len(fcrypt('A' * i))
+        if cur_len - orig_len:
+            blocklen = cur_len - orig_len
+            return blocklen
+    return -1
+
+
 def cc9():
     """9. Implement PKCS#7 padding
 
@@ -202,18 +213,14 @@ f. Repeat for the next byte.
         return AES.new(key, mode=AES.MODE_ECB).encrypt(pkcs7_pad(16, data + unknown))
 
     key = random_key(16)
+    fcrypt = partial(encryption_oracle, key)
 
-    #push ciphertext over into the next block length
-    orig_len = len(encryption_oracle(key, ''))
-    for i in xrange(1, 128):
-        cur_len = len(encryption_oracle(key, 'A' * i))
-        if cur_len - orig_len:
-            blocklen = cur_len - orig_len
-            print 'Blocklength:', blocklen
-            break
+    #detect blocklen
+    blocklen = detect_blocklen(fcrypt)
+    print 'Blocklength:', blocklen
 
     #detect mode
-    mode = detect_mode(encryption_oracle(key, 'A' * 48))
+    mode = detect_mode(fcrypt('A' * 48))
     print 'Mode:', 'ecb' if mode == AES.MODE_ECB else 'cbc'
 
     def decrypt_block(blocklen, fcrypt, known):
@@ -231,7 +238,6 @@ f. Repeat for the next byte.
         return plain
 
     #decrypt unknown from oracle
-    fcrypt = partial(encryption_oracle, key)
     cipher_blocks = len(fcrypt('')) / blocklen
     output = ''
     for _ in xrange(cipher_blocks):
@@ -351,6 +357,21 @@ all the tools you already have; no crazy math is required.
 
 Think about the words "STIMULUS" and "RESPONSE".
 """
+    def encryption_oracle(key, prefix, data):
+        unknown = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK".decode('base64')
+        return AES.new(key, mode=AES.MODE_ECB).encrypt(pkcs7_pad(16, prefix + data + unknown))
+
+    key = random_key(16)
+    prefix = random_key(random.randint(1,32))
+    fcrypt = partial(encryption_oracle, key, prefix)
+
+    #detect blocklen
+    blocklen = detect_blocklen(fcrypt)
+    print 'Blocklength:', blocklen
+
+    #detect mode
+    mode = detect_mode(fcrypt('A' * 48))
+    print 'Mode:', 'ecb' if mode == AES.MODE_ECB else 'cbc'
 
 
 def cc15():
