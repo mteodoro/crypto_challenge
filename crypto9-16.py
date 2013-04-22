@@ -8,6 +8,7 @@ from Crypto.Cipher import AES
 
 random.seed('matasano')
 
+
 def random_key(keylen):
     return ''.join(chr(random.randint(0,255)) for _ in xrange(keylen))
 
@@ -15,6 +16,7 @@ def random_key(keylen):
 def pkcs7_pad(blocklen, data):
     padlen = blocklen - len(data) % blocklen
     return data + chr(padlen) * padlen
+
 
 class PadException(Exception):
         pass
@@ -27,7 +29,6 @@ def pkcs7_strip(data):
     return data[:-padlen]
 
 
-
 def xor_block(b1, b2):
     return ''.join(chr(ord(x) ^ ord(y)) for x,y in zip(b1, b2))
 
@@ -38,17 +39,6 @@ def grouper(n, iterable, fillvalue=None):
     # grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx
     args = [iter(iterable)] * n
     return itertools.izip_longest(fillvalue=fillvalue, *args)
-
-
-def cbc_decrypt(key, iv, data):
-    output = []
-    prev_block = iv
-    for block in grouper(len(key), data):
-        block = ''.join(block)
-        x = AES.new(key).decrypt(block)
-        output.append(xor_block(prev_block, x))
-        prev_block = block
-    return ''.join(output)
 
 
 def detect_mode(ciphertext):
@@ -122,6 +112,16 @@ SUBMARINE" with an IV of all ASCII 0 (\x00\x00\x00 &c)
 """
     with open('data/cc10.txt') as f:
         ciphertext = ''.join(line for line in f).decode('base64')
+
+    def cbc_decrypt(key, iv, data):
+        output = []
+        prev_block = iv
+        for block in grouper(len(key), data):
+            block = ''.join(block)
+            x = AES.new(key, mode=AES.MODE_ECB).decrypt(block)
+            output.append(xor_block(prev_block, x))
+            prev_block = block
+        return ''.join(output)
 
     print cbc_decrypt("YELLOW SUBMARINE", '\x00' * 16, ciphertext)
 
@@ -240,6 +240,7 @@ f. Repeat for the next byte.
     #detect mode
     mode = detect_mode(fcrypt('A' * 48))
     print 'Mode:', 'ecb' if mode == AES.MODE_ECB else 'cbc'
+    print
 
     def decrypt_block(blocklen, fcrypt, known):
         "decrypt block by passing prefixes into oracle function fcrypt"
@@ -339,24 +340,25 @@ profile.
     email = 'vanil@ice.com'
     print profile_for(email)
     print '^' * 32
-    cipher = encryption_oracle(key, email)[:32]
+    blocks1_2 = encryption_oracle(key, email)[:32]
 
     print
     print "Step 2: Create 3rd block that starts with 'admin'"
     email = 'XXXXXXXXXX' + 'admin'
     print profile_for(email)
     print ' ' * 15, '^' * 16
-    cipher += encryption_oracle(key, email)[16:32]
+    block3 = encryption_oracle(key, email)[16:32]
 
     print
-    print "Step 3: Create 4th block for proper decoding resulting in junk 'rolemail' key"
+    print "Step 3: Create 4th block for proper kv parsing resulting in junk 'rolemail' key"
     email = 'XXXXXXXXXX'
     print profile_for(email)
     print '^' * 16
-    cipher += encryption_oracle(key, email)[:16]
+    block4 = encryption_oracle(key, email)[:16]
 
-    plain = AES.new(key, mode=AES.MODE_ECB).decrypt(cipher)
     print
+    print "Step 4: Cat our blocks together and decrypt them"
+    plain = AES.new(key, mode=AES.MODE_ECB).decrypt(blocks1_2 + block3 + block4)
     print 'Decrypted:', plain
     print 'Parsed:', kvparse(plain)
     print
@@ -381,11 +383,11 @@ all the tools you already have; no crazy math is required.
 Think about the words "STIMULUS" and "RESPONSE".
 """
     print """
-This is harder because you have to detect the length of the prefix and pad
-it out to the next blocklen so you have a clean block to use for the 
+This is harder because we have to detect the length of the prefix and pad
+it out to the next blocklen so we have a clean block to use for the
 byte-by-byte decryption.
 
-Detect full prefix blocks by seeing how many ciphertext blocks don't change
+We detect full prefix blocks by seeing how many ciphertext blocks don't change
 when adding a byte of data, then detect the length of the partial prefix
 block by adding bytes until it doesn't change either.
 """
@@ -428,6 +430,7 @@ block by adding bytes until it doesn't change either.
 
     prefixlen = detect_prefixlen(blocklen, fcrypt)
     print 'Prefix length:', prefixlen
+    print
 
     def decrypt_block(blocklen, prefixlen, fcrypt, known):
         "decrypt block by passing prefixes into oracle function fcrypt"
@@ -533,7 +536,7 @@ block.
 Before you implement this attack, answer this question: why does CBC
 mode have this property?
 """
-    print """why does CBC mode have this property?
+    print """Why does CBC mode have this property?
 
 CBC recovers the plaintext by XORing the decrypted block with the previous block's
 ciphertext, so flipping a bit of ciphertext doesn't affect the next block's decryption,
@@ -565,7 +568,6 @@ it only flips the corresponding plaintext bit.
     plain = decrypt(key, iv, ciphertext)
     print 'Output:', plain
     print "Found ';admin=true;':", ';admin=true;' in plain
-
 
 
 if __name__ == '__main__':
