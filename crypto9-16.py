@@ -2,8 +2,11 @@
 from functools import partial
 import itertools
 import random
+import urllib
 
 from Crypto.Cipher import AES
+
+random.seed('matasano')
 
 def random_key(keylen):
     return ''.join(chr(random.randint(0,255)) for _ in xrange(keylen))
@@ -12,6 +15,17 @@ def random_key(keylen):
 def pkcs7_pad(blocklen, data):
     padlen = blocklen - len(data) % blocklen
     return data + chr(padlen) * padlen
+
+class PadException(Exception):
+        pass
+
+def pkcs7_strip(data):
+    padchar = data[-1]
+    padlen = ord(padchar)
+    if not data.endswith(padchar * padlen):
+        raise PadException
+    return data[:-padlen]
+
 
 
 def xor_block(b1, b2):
@@ -465,17 +479,6 @@ does not have valid padding, nor does:
 If you are writing in a language with exceptions, like Python or Ruby,
 make your function throw an exception on bad padding.
 """
-
-    class PadException(Exception):
-        pass
-
-    def pkcs7_validate(data):
-        padchar = data[-1]
-        padlen = ord(padchar)
-        if not data.endswith(padchar * padlen):
-            raise PadException
-        return data[:-padlen]
-
     test_strings = [
             "ICE ICE BABY\x04\x04\x04\x04",
             "ICE ICE BABY\x05\x05\x05\x05",
@@ -484,7 +487,7 @@ make your function throw an exception on bad padding.
 
     for t in test_strings:
         try:
-            print '%s: %s' % (repr(t), pkcs7_validate(t))
+            print '%s: %s' % (repr(t), pkcs7_strip(t))
         except PadException as e:
             print '%s: %s' % (repr(t), repr(e))
 
@@ -530,6 +533,39 @@ block.
 Before you implement this attack, answer this question: why does CBC
 mode have this property?
 """
+    print """why does CBC mode have this property?
+
+CBC recovers the plaintext by XORing the decrypted block with the previous block's
+ciphertext, so flipping a bit of ciphertext doesn't affect the next block's decryption,
+it only flips the corresponding plaintext bit.
+"""
+    key = random_key(16)
+    iv = random_key(16)
+
+    def encrypt(key, iv, data):
+        prefix = "comment1=cooking%20MCs;userdata="
+        suffix = ";comment2=%20like%20a%20pound%20of%20bacon"
+        for c in ';=':
+            data = data.replace(c, '%%%X' % ord(c))
+        data = pkcs7_pad(16, prefix + data + suffix)
+        return AES.new(key, mode=AES.MODE_CBC, IV=iv).encrypt(data)
+
+    def decrypt(key, iv, data):
+        return pkcs7_strip(AES.new(key, mode=AES.MODE_CBC, IV=iv).decrypt(data))
+
+    data = 'XXXXXXXXXXXXXXXX?admin?true'
+    print 'Input:', data
+    ciphertext = encrypt(key, iv, data)
+
+    ciphertext = list(ciphertext)
+    ciphertext[32] = chr(ord(ciphertext[32]) ^ (ord('?') ^ ord(';')))
+    ciphertext[38] = chr(ord(ciphertext[38]) ^ (ord('?') ^ ord('=')))
+    ciphertext = ''.join(ciphertext)
+
+    plain = decrypt(key, iv, ciphertext)
+    print 'Output:', plain
+    print "Found ';admin=true;':", ';admin=true;' in plain
+
 
 
 if __name__ == '__main__':
