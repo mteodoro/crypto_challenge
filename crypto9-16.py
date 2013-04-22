@@ -217,7 +217,7 @@ f. Repeat for the next byte.
 
     #detect blocklen
     blocklen = detect_blocklen(fcrypt)
-    print 'Blocklength:', blocklen
+    print 'Block length:', blocklen
 
     #detect mode
     mode = detect_mode(fcrypt('A' * 48))
@@ -357,6 +357,16 @@ all the tools you already have; no crazy math is required.
 
 Think about the words "STIMULUS" and "RESPONSE".
 """
+    print """
+This is harder because you have to detect the length of the prefix and pad
+it out to the next blocklen so you have a clean block to use for the 
+byte-by-byte decryption.
+
+Detect full prefix blocks by seeing how many ciphertext blocks don't change
+when adding a byte of data, then detect the length of the partial prefix
+block by adding bytes until it doesn't change either.
+"""
+
     def encryption_oracle(key, prefix, data):
         unknown = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK".decode('base64')
         return AES.new(key, mode=AES.MODE_ECB).encrypt(pkcs7_pad(16, prefix + data + unknown))
@@ -367,11 +377,60 @@ Think about the words "STIMULUS" and "RESPONSE".
 
     #detect blocklen
     blocklen = detect_blocklen(fcrypt)
-    print 'Blocklength:', blocklen
+    print 'Block length:', blocklen
 
     #detect mode
     mode = detect_mode(fcrypt('A' * 48))
     print 'Mode:', 'ecb' if mode == AES.MODE_ECB else 'cbc'
+
+    def detect_prefixlen(blocklen, fcrypt):
+        #detect full prefix blocks
+        prefixlen = 0
+        blocks1 = grouper(blocklen, fcrypt(''))
+        blocks2 = grouper(blocklen, fcrypt('A'))
+        for b1,b2 in zip(blocks1, blocks2):
+            if b1 != b2:
+                break
+            prefixlen += blocklen
+
+        #add last (partial-block) prefix length
+        offset = prefixlen
+        for i in xrange(blocklen):
+            b1 = fcrypt('A' * i)[offset:offset + blocklen]
+            b2 = fcrypt('A' * (i + 1))[offset:offset + blocklen]
+            if b1 == b2:
+                prefixlen += blocklen - i
+                break
+        return prefixlen
+
+    prefixlen = detect_prefixlen(blocklen, fcrypt)
+    print 'Prefix length:', prefixlen
+
+    def decrypt_block(blocklen, prefixlen, fcrypt, known):
+        "decrypt block by passing prefixes into oracle function fcrypt"
+        offset = 0
+        while offset <= prefixlen:
+            offset += blocklen
+        offset += len(known)
+        plain = ''
+        prefix_pad = 'X' * (blocklen - prefixlen % blocklen)
+        for i in xrange(blocklen,0,-1):
+            pad = prefix_pad + 'A' * (i - 1)
+            cipher_block = fcrypt(pad)[offset:offset + blocklen]
+            pad += known + plain
+            for c in (chr(x) for x in xrange(256)):
+                if cipher_block == fcrypt(pad + c)[offset:offset + blocklen]:
+                    plain += c
+                    break
+        return plain
+
+    #decrypt unknown from oracle
+    cipher_blocks = len(fcrypt('')) / blocklen
+    output = ''
+    for _ in xrange(cipher_blocks):
+        output += decrypt_block(blocklen, prefixlen, fcrypt, output)
+    print 'Plaintext:'
+    print output
 
 
 def cc15():
