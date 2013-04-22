@@ -11,8 +11,6 @@ def random_key(keylen):
 
 def pkcs7_pad(blocklen, data):
     padlen = blocklen - len(data) % blocklen
-    if padlen == blocklen:
-        return data
     return data + chr(padlen) * padlen
 
 
@@ -74,7 +72,13 @@ padded to 20 bytes would be:
 
 The particulars of this algorithm are easy to find online.
 """
-    print repr(pkcs7_pad(20, "YELLOW SUBMARINE"))
+    test_data = [
+            (20, 'YELLOW SUBMARINE'),
+            (16, 'YELLOW SUBMARINE'),
+            (8, '')]
+
+    for padlen,data in test_data:
+        print padlen, repr(data), repr(pkcs7_pad(padlen, data))
 
 
 def cc10():
@@ -456,6 +460,28 @@ does not have valid padding, nor does:
 If you are writing in a language with exceptions, like Python or Ruby,
 make your function throw an exception on bad padding.
 """
+
+    class PadException(Exception):
+        pass
+
+    def pkcs7_validate(data):
+        padchar = data[-1]
+        padlen = ord(padchar)
+        if not data.endswith(padchar * padlen):
+            raise PadException
+        return data[:-padlen]
+
+    test_strings = [
+            "ICE ICE BABY\x04\x04\x04\x04",
+            "ICE ICE BABY\x05\x05\x05\x05",
+            "ICE ICE BABY\x01\x02\x03\x04",
+            "ICE ICE BABY"]
+
+    for t in test_strings:
+        try:
+            print '%s: %s' % (repr(t), pkcs7_validate(t))
+        except PadException as e:
+            print '%s: %s' % (repr(t), repr(e))
 
 
 def cc16():
