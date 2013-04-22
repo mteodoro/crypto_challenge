@@ -290,6 +290,22 @@ Using only the user input to profile_for() (as an oracle to generate
 "valid" ciphertexts) and the ciphertexts themselves, make a role=admin
 profile.
 """
+    def kvparse(kv):
+        return dict(x.split('=') for x in kv.split('&'))
+
+    print 'Parsed:', kvparse('foo=bar&baz=qux&zap=zazzle')
+
+    def profile_for(addr):
+        addr = addr.translate(None, '=&')
+        return 'email=%s&uid=10&role=user' % addr
+
+    profile = profile_for("foo@bar.com")
+    print 'Encoded:', profile
+
+    key = random_key(16)
+    ciphertext = AES.new(key, mode=AES.MODE_ECB).encrypt(pkcs7_pad(16, profile))
+    print repr(ciphertext)
+
 
 
 def cc14():
