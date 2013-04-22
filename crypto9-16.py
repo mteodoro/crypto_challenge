@@ -303,14 +303,16 @@ profile.
     def kvparse(kv):
         return dict(x.split('=') for x in kv.split('&'))
 
-    print 'Parsed:', kvparse('foo=bar&baz=qux&zap=zazzle')
+    kv = 'foo=bar&baz=qux&zap=zazzle'
+    print '%s: %s' % (kv, kvparse(kv))
+    print
 
-    def profile_for(addr):
-        addr = addr.translate(None, '=&')
-        return 'email=%s&uid=10&role=user' % addr
+    def profile_for(email):
+        email = email.translate(None, '=&')
+        return 'email=%s&uid=10&role=user' % email
 
-    profile = profile_for("foo@bar.com")
-    print 'Encoded:', profile
+    for email in ('foo@bar.com', 'foo@bar.com&role=admin'):
+        print '%s: %s' % (email, profile_for(email))
     print
 
     def encryption_oracle(key, email):
@@ -320,21 +322,24 @@ profile.
     key = random_key(16)
 
     print "Step 1: 13-byte email forces 2nd block to end with '&role='"
-    print profile_for('vanil@ice.com')
+    email = 'vanil@ice.com'
+    print profile_for(email)
     print '^' * 32
-    cipher = encryption_oracle(key, 'vanil@ice.com')[:32]
+    cipher = encryption_oracle(key, email)[:32]
 
     print
     print "Step 2: Create 3rd block that starts with 'admin'"
-    print profile_for('XXXXXXXXXX' + 'admin')
+    email = 'XXXXXXXXXX' + 'admin'
+    print profile_for(email)
     print ' ' * 15, '^' * 16
-    cipher += encryption_oracle(key, 'XXXXXXXXXX' + 'admin')[16:32]
+    cipher += encryption_oracle(key, email)[16:32]
 
     print
     print "Step 3: Create 4th block for proper decoding resulting in junk 'rolemail' key"
-    print profile_for('XXXXXXXXXX')
+    email = 'XXXXXXXXXX'
+    print profile_for(email)
     print '^' * 16
-    cipher += encryption_oracle(key, 'XXXXXXXXXX')[:16]
+    cipher += encryption_oracle(key, email)[:16]
 
     plain = AES.new(key, mode=AES.MODE_ECB).decrypt(cipher)
     print
