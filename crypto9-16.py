@@ -216,75 +216,6 @@ f. Repeat for the next byte.
     mode = detect_mode(encryption_oracle_ecb(key, 'A' * 48))
     print 'b: Mode:', 'ecb' if mode == AES.MODE_ECB else 'cbc'
 
-    #cipher_blocks = len(encryption_oracle_ecb(key, '')) / blocklen
-    #for block in xrange(cipher_blocks):
-
-    #for i in xrange(1, blocklen + 1):
-    #    block_plain = {}
-    #    blockpad = 'A' * (blocklen - i)
-    #    print len(blockpad), blockpad
-    #    #for c in (chr(x) for x in xrange(256)):
-
-
-    #blockpad = 'A' * (blocklen - 1)
-    #cipher_block = encryption_oracle_ecb(key, blockpad)[:blocklen]
-    #print cipher_block
-    #for c in (chr(x) for x in xrange(256)):
-    #    test_block = encryption_oracle_ecb(key, blockpad + c)[:blocklen]
-    #    if test_block == cipher_block:
-    #        print c
-    #        break
-
-    def decrypt_block_new(blocklen, fcrypt, known):
-        plain = ''
-        blockpad = 'A' * (blocklen - 1)
-        while blockpad:
-            cipher_block = fcrypt(blockpad)[:blocklen]
-            print blockpad
-            print cipher_block
-            print blockpad + plain + '?'
-            print len(blockpad + plain + '?')
-            for c in (chr(x) for x in xrange(256)):
-                test_block = fcrypt(blockpad + plain + c)[:blocklen]
-                if test_block == cipher_block:
-                    plain += c
-                    print plain
-                    break
-            blockpad = blockpad[:-1]
-            print
-        return plain
-
-    def decrypt_block_foo(blocklen, fcrypt, offset):
-        offset *= blocklen
-        print offset
-        plain = ''
-        for i in xrange(15,-1,-1):
-            blockpad = 'A' * i
-            print blockpad
-            cipher_block = fcrypt(blockpad)[offset:offset + blocklen]
-            print blockpad + plain
-            for c in (chr(x) for x in xrange(256)):
-                test_block = fcrypt(blockpad + plain + c)[offset:offset + blocklen]
-                if test_block == cipher_block:
-                    plain += c
-                    break
-        return plain
-
-
-    def decrypt_block_good(blocklen, fcrypt, known):
-        plain = ''
-        for i in xrange(15,-1,-1):
-            blockpad = 'A' * i
-            print blockpad
-            cipher_block = fcrypt(blockpad)[len(known):len(known) + blocklen]
-            for c in (chr(x) for x in xrange(256)):
-                test_block = fcrypt(blockpad + known + plain + c)[len(known):len(known) + blocklen]
-                if test_block == cipher_block:
-                    plain += c
-                    break
-        return plain
-
-
     def decrypt_block(blocklen, fcrypt, known):
         offset = len(known)
         plain = ''
@@ -303,20 +234,13 @@ f. Repeat for the next byte.
 
 
     fcrypt = partial(encryption_oracle_ecb, key)
+
+    cipher_blocks = len(fcrypt('')) / blocklen
+    print cipher_blocks
     output = ''
-    
-
-
-    output = decrypt_block(blocklen, fcrypt, '')
-    print output
-    output += decrypt_block(blocklen, fcrypt, output)
+    for _ in xrange(cipher_blocks):
+        output += decrypt_block(blocklen, fcrypt, output)
     print len(output), output
-    return
-
-
-    for block in (0,1):
-        output = decrypt_block(blocklen, fcrypt, block)
-        print 'output:' + output
 
 
 def cc13():
