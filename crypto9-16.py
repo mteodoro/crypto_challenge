@@ -197,50 +197,47 @@ unknown-string.
 
 f. Repeat for the next byte.
 """
-    def encryption_oracle_ecb(key, data):
+    def encryption_oracle(key, data):
         unknown = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK".decode('base64')
         return AES.new(key, mode=AES.MODE_ECB).encrypt(pkcs7_pad(16, data + unknown))
 
     key = random_key(16)
 
     #push ciphertext over into the next block length
-    orig_len = len(encryption_oracle_ecb(key, ''))
+    orig_len = len(encryption_oracle(key, ''))
     for i in xrange(1, 128):
-        cur_len = len(encryption_oracle_ecb(key, 'A' * i))
+        cur_len = len(encryption_oracle(key, 'A' * i))
         if cur_len - orig_len:
             blocklen = cur_len - orig_len
-            print 'a: Blocklength:', blocklen
+            print 'Blocklength:', blocklen
             break
 
     #detect mode
-    mode = detect_mode(encryption_oracle_ecb(key, 'A' * 48))
-    print 'b: Mode:', 'ecb' if mode == AES.MODE_ECB else 'cbc'
+    mode = detect_mode(encryption_oracle(key, 'A' * 48))
+    print 'Mode:', 'ecb' if mode == AES.MODE_ECB else 'cbc'
 
     def decrypt_block(blocklen, fcrypt, known):
+        "decrypt block by passing prefixes into oracle function fcrypt"
         offset = len(known)
         plain = ''
-        for i in xrange(15,-1,-1):
-            blockpad = 'A' * i
-            cipher_block = fcrypt(blockpad)[offset:offset + blocklen]
-            blockpad += known + plain
+        for i in xrange(blocklen,0,-1):
+            pad = 'A' * (i - 1)
+            cipher_block = fcrypt(pad)[offset:offset + blocklen]
+            pad += known + plain
             for c in (chr(x) for x in xrange(256)):
-                test_block = fcrypt(blockpad + c)[offset:offset + blocklen]
-                if test_block == cipher_block:
+                if cipher_block == fcrypt(pad + c)[offset:offset + blocklen]:
                     plain += c
                     break
         return plain
 
-
-
-
-    fcrypt = partial(encryption_oracle_ecb, key)
-
+    #decrypt unknown from oracle
+    fcrypt = partial(encryption_oracle, key)
     cipher_blocks = len(fcrypt('')) / blocklen
-    print cipher_blocks
     output = ''
     for _ in xrange(cipher_blocks):
         output += decrypt_block(blocklen, fcrypt, output)
-    print len(output), output
+    print 'Plaintext:'
+    print output
 
 
 def cc13():
