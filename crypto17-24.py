@@ -6,7 +6,27 @@ import urllib
 
 from Crypto.Cipher import AES
 
-random.seed('matasano')
+#random.seed('matasano')
+
+
+def random_key(keylen):
+    return ''.join(chr(random.randint(0,255)) for _ in xrange(keylen))
+
+
+def pkcs7_pad(blocklen, data):
+    padlen = blocklen - len(data) % blocklen
+    return data + chr(padlen) * padlen
+
+
+class PadException(Exception):
+        pass
+
+def pkcs7_strip(data):
+    padchar = data[-1]
+    padlen = ord(padchar)
+    if not data.endswith(padchar * padlen):
+        raise PadException
+    return data[:-padlen]
 
 
 def cc17():
@@ -73,7 +93,40 @@ on a CBC plaintext. It's an attack that targets a specific bit of code
 that handles decryption. You can mount a padding oracle on ANY CBC
 block, whether it's padded or not.
 """
+    strings = """
+MDAwMDAwTm93IHRoYXQgdGhlIHBhcnR5IGlzIGp1bXBpbmc=
+MDAwMDAxV2l0aCB0aGUgYmFzcyBraWNrZWQgaW4gYW5kIHRoZSBWZWdhJ3MgYXJlIHB1bXBpbic=
+MDAwMDAyUXVpY2sgdG8gdGhlIHBvaW50LCB0byB0aGUgcG9pbnQsIG5vIGZha2luZw==
+MDAwMDAzQ29va2luZyBNQydzIGxpa2UgYSBwb3VuZCBvZiBiYWNvbg==
+MDAwMDA0QnVybmluZyAnZW0sIGlmIHlvdSBhaW4ndCBxdWljayBhbmQgbmltYmxl
+MDAwMDA1SSBnbyBjcmF6eSB3aGVuIEkgaGVhciBhIGN5bWJhbA==
+MDAwMDA2QW5kIGEgaGlnaCBoYXQgd2l0aCBhIHNvdXBlZCB1cCB0ZW1wbw==
+MDAwMDA3SSdtIG9uIGEgcm9sbCwgaXQncyB0aW1lIHRvIGdvIHNvbG8=
+MDAwMDA4b2xsaW4nIGluIG15IGZpdmUgcG9pbnQgb2g=
+MDAwMDA5aXRoIG15IHJhZy10b3AgZG93biBzbyBteSBoYWlyIGNhbiBibG93
+""".strip().split()
 
+    key = random_key(16)
+
+    def encrypt(key, data):
+        iv = random_key(16)
+        return iv, AES.new(key, IV=iv, mode=AES.MODE_CBC).encrypt(pkcs7_pad(16, data))
+
+    def check_padding(key, iv, data):
+        plain = AES.new(key, IV=iv, mode=AES.MODE_CBC).decrypt(data)
+        try:
+            pkcs7_strip(plain)
+            return True
+        except PadException:
+            return False
+
+
+    data = random.choice(strings)
+    print data
+    iv, ciphertext = encrypt(key, data)
+    #print iv, ciphertext
+
+    print check_padding(key, iv, ciphertext)
 
 def cc18():
     """18. Implement CTR mode
