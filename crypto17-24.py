@@ -2,6 +2,7 @@
 from functools import partial
 import itertools
 import random
+import string
 import struct
 
 from Crypto.Cipher import AES
@@ -22,6 +23,18 @@ def pairwise(iterable):
     a, b = itertools.tee(iterable)
     next(b, None)
     return itertools.izip(a, b)
+
+
+def window(seq, n=2):
+    "Returns a sliding window (of width n) over data from the iterable"
+    "   s -> (s0,s1,...s[n-1]), (s1,s2,...,sn), ...                   "
+    it = iter(seq)
+    result = tuple(itertools.islice(it, n))
+    if len(result) == n:
+        yield ''.join(result)
+    for elem in it:
+        result = result[1:] + (elem,)
+        yield ''.join(result)
 
 
 def random_key(keylen):
@@ -46,6 +59,36 @@ def pkcs7_strip(data):
     if padlen == 0 or not data.endswith(padchar * padlen):
         raise PadException
     return data[:-padlen]
+
+
+def xor_aes_ctr(key, nonce, data):
+    def gen_keystream(key, nonce):
+        aes = AES.new(key, mode=AES.MODE_ECB)
+        ctr = 0
+        while True:
+            for c in aes.encrypt(struct.pack('<QQ', nonce, ctr)):
+                yield c
+            ctr += 1
+
+    keystream = gen_keystream(key, nonce)
+    return ''.join(chr(ord(x) ^ ord(y)) for x,y in itertools.izip(data, keystream))
+
+
+ok = set(string.letters + ' ')
+def score_ratio(s):
+    "ratio of letters+space to total length"
+    count = sum(1 for x in s if x in ok)
+    return count / float(len(s))
+
+
+def score_decodings(keys, fscore, data):
+    "return list of decodings, scored by fscore"
+    scores = []
+    for key in keys:
+        plain = xor_block(key, data)
+        score = fscore(plain)
+        scores.append((score, key, plain))
+    return sorted(scores, reverse=True)
 
 
 def cc17():
@@ -214,21 +257,7 @@ function to encrypt and decrypt other things.
 """
     key = 'YELLOW SUBMARINE'
     data = 'L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ=='.decode('base64')
-    #print struct.pack('<QQ', 0,1).encode('hex')
-
-    def gen_keystream(key, nonce):
-        aes = AES.new(key, mode=AES.MODE_ECB)
-        ctr = 0
-        while True:
-            for c in aes.encrypt(struct.pack('<QQ', nonce, ctr)):
-                yield c 
-            ctr += 1
-
-    def decrypt_ctr(key, nonce, data):
-        keystream = gen_keystream(key, nonce)
-        return ''.join(chr(ord(x) ^ ord(y)) for x,y in itertools.izip(data, keystream))
-
-    print decrypt_ctr(key, 0, data)
+    print xor_aes_ctr(key, 0, data)
 
 
 def cc19():
@@ -306,7 +335,32 @@ English trigrams, and so on. Points for automating this, but part of
 the reason I'm having you do this is that I think this approach is
 suboptimal.
 """
+    strings = [s.strip() for s in cc19.__doc__.splitlines()[9:49]]
+    key = random_key(16)
+    ciphertexts = [xor_aes_ctr(key, 0, s.decode('base64')) for s in strings]
+    for i, c in enumerate(ciphertexts):
+        print i, len(c), c.encode('hex')
 
+    #shortest = min((len(c),i) for i,c in enumerate(ciphertexts))
+    #print shortest
+    #cols = [''.join(col) for col in zip(*ciphertexts)]
+    #print cols[0]
+    #for col in cols:
+
+    c1 = ciphertexts[1]
+
+    for c2 in ciphertexts[1:]:
+        stop = min(len(c1), len(c2))
+        combined = xor_block(c1[:stop], c2[:stop])
+        test = 'white'
+        tlen = len(test)
+        print [xor_block(test, w) for w in window(combined, tlen) if all(x in ok for x in xor_block(test, w))]
+
+    print xor_block('abc', '123')
+    print xor_block('abc', '456')
+    print xor_block('PPP', 'UWU').encode('hex')
+    print xor_block('PPP', 'abc')
+    print xor_block('PPP', '123')
 
 def cc20():
     """20. Break fixed-nonce CTR mode using stream cipher analysis
