@@ -6,11 +6,30 @@ import urllib
 
 from Crypto.Cipher import AES
 
-#random.seed('matasano')
+random.seed('matasano')
+
+
+#http://docs.python.org/2/library/itertools.html#recipes
+def grouper(n, iterable, fillvalue=None):
+    "Collect data into fixed-length chunks or blocks"
+    # grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx
+    args = [iter(iterable)] * n
+    return itertools.izip_longest(fillvalue=fillvalue, *args)
+
+
+def pairwise(iterable):
+    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    a, b = itertools.tee(iterable)
+    next(b, None)
+    return itertools.izip(a, b)
 
 
 def random_key(keylen):
     return ''.join(chr(random.randint(0,255)) for _ in xrange(keylen))
+
+
+def xor_block(b1, b2):
+    return ''.join(chr(ord(x) ^ ord(y)) for x,y in zip(b1, b2))
 
 
 def pkcs7_pad(blocklen, data):
@@ -24,7 +43,7 @@ class PadException(Exception):
 def pkcs7_strip(data):
     padchar = data[-1]
     padlen = ord(padchar)
-    if not data.endswith(padchar * padlen):
+    if padlen == 0 or not data.endswith(padchar * padlen):
         raise PadException
     return data[:-padlen]
 
@@ -106,8 +125,6 @@ MDAwMDA4b2xsaW4nIGluIG15IGZpdmUgcG9pbnQgb2g=
 MDAwMDA5aXRoIG15IHJhZy10b3AgZG93biBzbyBteSBoYWlyIGNhbiBibG93
 """.strip().split()
 
-    key = random_key(16)
-
     def encrypt(key, data):
         iv = random_key(16)
         return iv, AES.new(key, IV=iv, mode=AES.MODE_CBC).encrypt(pkcs7_pad(16, data))
@@ -120,13 +137,33 @@ MDAwMDA5aXRoIG15IHJhZy10b3AgZG93biBzbyBteSBoYWlyIGNhbiBibG93
         except PadException:
             return False
 
+    def decrypt(blocklen, fcheck, data):
+        def decrypt_byte(block, known):
+            ridx = len(known) + 1
+            suffix = ''.join(chr(ord(x) ^ ridx) for x in known)
+            attack = random_key(blocklen - ridx)
+            for i in xrange(256):
+                if fcheck(attack + chr(i) + suffix, block):
+                    #TODO test for length of padding
+                    return chr(ridx ^ i)
 
-    data = random.choice(strings)
-    print data
+        plain = ''
+        blocks = list(''.join(b) for b in grouper(blocklen, data))
+        for prev, cur in pairwise(blocks):
+            known = ''
+            while len(known) < blocklen:
+                known = decrypt_byte(cur, known) + known
+            plain += xor_block(prev, known)
+        return pkcs7_strip(plain)
+
+    key = random_key(16)
+    data = random.choice(strings).decode('base64')
     iv, ciphertext = encrypt(key, data)
-    #print iv, ciphertext
+    fcheck = partial(check_padding, key)
+    plain = decrypt(16, fcheck, iv + ciphertext)
+    print plain
+    print 'Match' if data == plain else 'No Match'
 
-    print check_padding(key, iv, ciphertext)
 
 def cc18():
     """18. Implement CTR mode
