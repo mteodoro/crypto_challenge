@@ -2,7 +2,7 @@
 from functools import partial
 import itertools
 import random
-import urllib
+import struct
 
 from Crypto.Cipher import AES
 
@@ -212,6 +212,23 @@ XOR, and recover the plaintext.
 Decrypt the string at the top of this function, then use your CTR
 function to encrypt and decrypt other things.
 """
+    key = 'YELLOW SUBMARINE'
+    data = 'L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ=='.decode('base64')
+    #print struct.pack('<QQ', 0,1).encode('hex')
+
+    def gen_keystream(key, nonce):
+        aes = AES.new(key, mode=AES.MODE_ECB)
+        ctr = 0
+        while True:
+            for c in aes.encrypt(struct.pack('<QQ', nonce, ctr)):
+                yield c 
+            ctr += 1
+
+    def decrypt_ctr(key, nonce, data):
+        keystream = gen_keystream(key, nonce)
+        return ''.join(chr(ord(x) ^ ord(y)) for x,y in itertools.izip(data, keystream))
+
+    print decrypt_ctr(key, 0, data)
 
 
 def cc19():
