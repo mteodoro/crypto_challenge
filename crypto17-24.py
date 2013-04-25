@@ -6,6 +6,7 @@ from operator import itemgetter
 import random
 import string
 import struct
+import time
 
 from Crypto.Cipher import AES
 
@@ -495,6 +496,8 @@ in Python, Ruby, or (gah) PHP, your language is probably already
 giving you MT19937 as "rand()"; don't use rand(). Write the RNG
 yourself.
 """
+    print "First 16 outputs with seed=1"
+
     rng = MersenneTwister(1)
     for i in xrange(16):
         print rng.rand()
@@ -522,6 +525,28 @@ exercise if you do that.
 
 From the 32 bit RNG output, discover the seed.
 """
+    def get_number(minwait, maxwait, fast=False):
+        tnow = int(time.time())
+        wait = random.randint(minwait, maxwait)
+        tnow += wait
+        if not fast:
+            time.sleep(wait)
+        rng = MersenneTwister(tnow)
+        wait = random.randint(minwait, maxwait)
+        tnow += wait
+        if not fast:
+            time.sleep(wait)
+        return tnow, rng.rand()
+
+    #tnow, output = get_number(5, 10)
+    tnow, output = get_number(40, 1000, fast=True)
+    print 'Output:', output
+
+    #find any seed in the last 10k seconds
+    for seed in xrange(tnow, tnow - 10000, -1):
+        if MersenneTwister(seed).rand() == output:
+            print "Seed:", seed
+            break
 
 
 def cc23():
