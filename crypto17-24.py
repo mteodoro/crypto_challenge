@@ -1,6 +1,8 @@
 #!/usr/bin/env python
+from collections import defaultdict
 from functools import partial
 import itertools
+from operator import itemgetter
 import random
 import string
 import struct
@@ -346,7 +348,75 @@ suboptimal.
     strings = [s.strip() for s in cc19.__doc__.splitlines()[9:49]]
     key = random_key(16)
     ciphertexts = [xor_aes_ctr(key, 0, s.decode('base64')) for s in strings]
+
+
+    tests = [(0, 'the'), (0, ' them '), (7, ' meaningless words, '), (31, ' vain-glorious '),
+            (14, 'ed, changed utterly ')]
+
+    def test_keystream(keystream):
+        for i,c in enumerate(ciphertexts):
+            print '%s\t%s' % (i, xor_block(keystream, c[:len(keystream)]))
+
+
+    def test_plain(keystream, idx, test, debug=False):
+        c1 = ciphertexts[idx]
+        tlen = len(test)
+
+        idx_counts = defaultdict(int)
+        for c2 in ciphertexts:
+            output = ''
+            for i in xrange(min(len(c1), len(c2))):
+                key = xor_block(test, c1[i:i+tlen])
+                plain = xor_block(key, c2[i:i+tlen])
+                if all(c in ok for c in plain):
+                    idx_counts[i] += 1
+                else:
+                    plain = ' ' * tlen
+                output += '|' + plain
+            if debug:
+                print output
+        key_idx = max((v,k) for k,v in idx_counts.iteritems())[1]
+        newkeystream = keystream[:key_idx]
+        newkeystream += xor_block(test, c1[key_idx:key_idx+tlen])
+        newkeystream += keystream[key_idx+tlen:]
+        return newkeystream
+
+
+    keystream = '-' * max(len(c) for c in ciphertexts)
+
+    print "Look for 'the' in first line.  Got lucky, column of reasonable decodes means it's there.  Expand it to ' them ' by trial and error"
+    print
+    keystream = test_plain(keystream, 0, ' them ', debug=True)
+
+    print
+    print "Guess 'meaningless' in line 5/7 and eventually expand it to ' meaningless words, '"
+    keystream = test_plain(keystream, 7, ' meaningless words, ')
+    test_keystream(keystream)
+
+    print """
+Bust out Google: 'meaningless words companion beautiful harriers'
+Easter, 1916, huh?  That's pretty early for MTV.  Test the theory:
+"""
+    keystream = xor_block('He, too, has been changed in his turn,', ciphertexts[37])
+    test_keystream(keystream)
+
+    print
+    print "Jackpot."
+    print
+
     return
+
+    for c2 in ciphertexts:
+        output = ''
+        for w1,w2 in zip(window(c1, tlen), window(c2, tlen)):
+            key = xor_block(w1, test)
+            plain = xor_block(key, w2)
+            #plain = ''.join(x for x in plain if x in ok else '_')
+            if not all(c in ok for c in plain):
+                plain = '   '
+            output += '|' + plain
+        print output
+
 
     for i, c in enumerate(ciphertexts):
         print i, len(c), c.encode('hex')
