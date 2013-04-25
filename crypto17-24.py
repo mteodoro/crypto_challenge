@@ -349,14 +349,9 @@ suboptimal.
     key = random_key(16)
     ciphertexts = [xor_aes_ctr(key, 0, s.decode('base64')) for s in strings]
 
-
-    tests = [(0, 'the'), (0, ' them '), (7, ' meaningless words, '), (31, ' vain-glorious '),
-            (14, 'ed, changed utterly ')]
-
     def test_keystream(keystream):
         for i,c in enumerate(ciphertexts):
             print '%s\t%s' % (i, xor_block(keystream, c[:len(keystream)]))
-
 
     def test_plain(keystream, idx, test, debug=False):
         c1 = ciphertexts[idx]
@@ -381,7 +376,6 @@ suboptimal.
         newkeystream += keystream[key_idx+tlen:]
         return newkeystream
 
-
     keystream = '-' * max(len(c) for c in ciphertexts)
 
     print "Look for 'the' in first line.  Got lucky, column of reasonable decodes means it's there.  Expand it to ' them ' by trial and error"
@@ -402,45 +396,9 @@ Easter, 1916, huh?  That's pretty early for MTV.  Test the theory:
 
     print
     print "Jackpot."
+    print "Keystream:", keystream.encode('hex')
     print
 
-    return
-
-    for c2 in ciphertexts:
-        output = ''
-        for w1,w2 in zip(window(c1, tlen), window(c2, tlen)):
-            key = xor_block(w1, test)
-            plain = xor_block(key, w2)
-            #plain = ''.join(x for x in plain if x in ok else '_')
-            if not all(c in ok for c in plain):
-                plain = '   '
-            output += '|' + plain
-        print output
-
-
-    for i, c in enumerate(ciphertexts):
-        print i, len(c), c.encode('hex')
-
-    #shortest = min((len(c),i) for i,c in enumerate(ciphertexts))
-    #print shortest
-    #cols = [''.join(col) for col in zip(*ciphertexts)]
-    #print cols[0]
-    #for col in cols:
-
-    c1 = ciphertexts[1]
-
-    for c2 in ciphertexts[1:]:
-        stop = min(len(c1), len(c2))
-        combined = xor_block(c1[:stop], c2[:stop])
-        test = 'white'
-        tlen = len(test)
-        print [xor_block(test, w) for w in window(combined, tlen) if all(x in ok for x in xor_block(test, w))]
-
-    print xor_block('abc', '123')
-    print xor_block('abc', '456')
-    print xor_block('PPP', 'UWU').encode('hex')
-    print xor_block('PPP', 'abc')
-    print xor_block('PPP', '123')
 
 def cc20():
     """20. Break fixed-nonce CTR mode using stream cipher analysis
