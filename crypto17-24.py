@@ -378,12 +378,15 @@ suboptimal.
 
     keystream = '-' * max(len(c) for c in ciphertexts)
 
-    print "Look for 'the' in first line.  Got lucky, column of reasonable decodes means it's there.  Expand it to ' them ' by trial and error"
-    print
+    print """
+Look for 'the' in first line.  Got lucky, column of reasonable decodes means it's there.
+Expand it to ' them ' by trial and error
+"""
     keystream = test_plain(keystream, 0, ' them ', debug=True)
 
-    print
-    print "Guess 'meaningless' in line 5/7 and eventually expand it to ' meaningless words, '"
+    print """
+Guess 'meaningless' in line 5/7 and eventually expand it to ' meaningless words, '
+"""
     keystream = test_plain(keystream, 7, ' meaningless words, ')
     test_keystream(keystream)
 
@@ -395,7 +398,6 @@ Easter, 1916, huh?  That's pretty early for MTV.  Test the theory:
     test_keystream(keystream)
 
     print
-    print "Jackpot."
     print "Keystream:", keystream.encode('hex')
     print
 
@@ -452,7 +454,6 @@ key XOR, with a key size of the length of the ciphertext you XOR'd.
     print
     print 'Block (min line) length:', blocklen
     print "Keystream: '%s'" % keystream.encode('hex')
-
 
 
 def cc21():
