@@ -131,6 +131,9 @@ class MersenneTwister(object):
         self.idx = (self.idx + 1) % 624
         return y
 
+    def snoop(self):
+        print "MT[%s]: %s" % (self.idx, self.MT[self.idx])
+
 
 
 def cc17():
@@ -583,6 +586,45 @@ The new "spliced" generator should predict the values of the original.
 How would you modify MT19937 to make this attack hard? What would
 happen if you subjected each tempered output to a cryptographic hash?
 """
+    rshift = lambda val, n: (val % 0x100000000) >> n
+
+    def invert_right(y, shiftlen):
+        i = 0
+        output = 0
+        while i * shiftlen < 32:
+            chunk = y & rshift(-1 << (32 - shiftlen), shiftlen * i)
+            y ^= rshift(chunk, shiftlen)
+            output |= chunk
+            i += 1
+        return output
+
+    def invert_left(y, shiftlen, mask):
+        i = 0
+        output = 0
+        while i * shiftlen < 32:
+            chunk = y & rshift(-1, 32 - shiftlen) << (shiftlen * i)
+            y ^= (chunk << shiftlen) & mask
+            output |= chunk
+            i += 1
+        return output
+
+    def untemper(y):
+        y = invert_right(y, 18)
+        y = invert_left(y, 15, 0xefc60000)
+        y = invert_left(y, 7, 0x9d2c5680)
+        y = invert_right(y, 11)
+        return y
+
+
+    rng1 = MersenneTwister(int(time.time()))
+    MT = [untemper(rng1.rand()) for _ in xrange(624)]
+
+    rng2 = MersenneTwister(0)
+    rng2.MT = MT
+
+    print 'Original\tClone'
+    for _ in xrange(16):
+        print '%s\t%s' % (rng1.rand(), rng2.rand())
 
 
 def cc24():
