@@ -71,6 +71,17 @@ def xor_aes_ctr(key, nonce, data):
     return ''.join(chr(ord(x) ^ ord(y)) for x,y in itertools.izip(data, gen_keystream()))
 
 
+def xor_data(key, data):
+    "xor key with data, repeating key as necessary"
+    if len(key) == 1:
+        #shortcut
+        key = ord(key)
+        return ''.join(chr(ord(x) ^ key) for x in data)
+
+    stream = itertools.cycle(key)
+    return ''.join(chr(ord(x) ^ ord(y)) for x,y in itertools.izip(data, stream))
+
+
 ok = set(string.letters + ' ')
 def score_ratio(s):
     "ratio of letters+space to total length"
@@ -82,7 +93,7 @@ def score_decodings(keys, fscore, data):
     "return list of decodings, scored by fscore"
     scores = []
     for key in keys:
-        plain = xor_block(key, data)
+        plain = xor_data(key, data)
         score = fscore(plain)
         scores.append((score, key, plain))
     return sorted(scores, reverse=True)
@@ -335,6 +346,8 @@ suboptimal.
     strings = [s.strip() for s in cc19.__doc__.splitlines()[9:49]]
     key = random_key(16)
     ciphertexts = [xor_aes_ctr(key, 0, s.decode('base64')) for s in strings]
+    return
+
     for i, c in enumerate(ciphertexts):
         print i, len(c), c.encode('hex')
 
@@ -383,6 +396,35 @@ work).
 Solve the resulting concatenation of ciphertexts as if for repeating-
 key XOR, with a key size of the length of the ciphertext you XOR'd.
 """
+    key = random_key(16)
+    with open('data/cc20.txt') as f:
+        ciphertexts = [xor_aes_ctr(key, 0, line.decode('base64')) for line in f]
+
+    blocklen = min(len(c) for c in ciphertexts)
+
+    #we can beat shortest (53 bytes) by extending blocklen till we don't have enough
+    #data to recover the plaintext with our scoring function.  91 bytes in this case.
+    #lengths = sorted(len(c) for c in ciphertexts)
+    #blocklen = lengths[-20]
+
+    blocks = [c[:blocklen] for c in ciphertexts if len(c) >= blocklen]
+    blocks = [''.join(b) for b in zip(*blocks)]
+
+    keys = [chr(x) for x in xrange(256)]
+
+    keystream = []
+    for block in blocks:
+        best = score_decodings(keys, score_ratio, block)[0]
+        keystream.append(best[1])
+
+    keystream = ''.join(keystream)
+    for block in (c[:blocklen] for c in ciphertexts):
+        print xor_block(keystream, block)
+
+    print
+    print 'Block (min line) length:', blocklen
+    print "Keystream: '%s'" % keystream.encode('hex')
+
 
 
 def cc21():
