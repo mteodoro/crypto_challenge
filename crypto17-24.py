@@ -650,6 +650,18 @@ MT19937 seeded from the current time.
 Write a function to check if any given password token is actually
 the product of an MT19937 PRNG seeded with the current time.
 """
+    def xor_mt_ctr(seed, data):
+        def gen_keystream():
+            rng = MersenneTwister(seed)
+            while True:
+                for c in struct.pack('!I', rng.rand()):
+                    yield c
+
+        return ''.join(chr(ord(x) ^ ord(y)) for x,y in itertools.izip(data, gen_keystream()))
+
+    data = 'YELLOW SUBMARINE'
+    cipher = xor_mt_ctr(0, data)
+    print xor_mt_ctr(0, cipher)
 
 
 if __name__ == '__main__':
