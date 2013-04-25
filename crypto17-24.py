@@ -62,14 +62,13 @@ def pkcs7_strip(data):
 
 
 def xor_aes_ctr(key, nonce, data):
-    def gen_keystream(key, nonce):
+    def gen_keystream():
         aes = AES.new(key, mode=AES.MODE_ECB)
-        for ctr in itertools.count():
-            for c in aes.encrypt(struct.pack('<QQ', nonce, ctr)):
+        for i in itertools.count():
+            for c in aes.encrypt(struct.pack('<QQ', nonce, i)):
                 yield c
 
-    keystream = gen_keystream(key, nonce)
-    return ''.join(chr(ord(x) ^ ord(y)) for x,y in itertools.izip(data, keystream))
+    return ''.join(chr(ord(x) ^ ord(y)) for x,y in itertools.izip(data, gen_keystream()))
 
 
 ok = set(string.letters + ' ')
