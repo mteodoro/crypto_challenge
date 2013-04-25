@@ -101,6 +101,37 @@ def score_decodings(keys, fscore, data):
     return sorted(scores, reverse=True)
 
 
+#Tested output against https://github.com/cslarsen/mersenne-twister
+class MersenneTwister(object):
+    def __init__(self, seed):
+        self.idx = 0
+        self.MT = [seed]
+        for i in xrange(1, 624):
+            last = self.MT[i - 1]
+            self.MT.append((0x6c078965 * (last ^ (last >> 30)) + i) & 0xFFFFFFFF)
+
+    def generate(self):
+        for i in xrange(624):
+            y = (self.MT[i] & 0x80000000) + (self.MT[(i+1) % 624] & 0x7fffffff)
+            self.MT[i] = self.MT[(i+397) % 624] ^ (y >> 1)
+            if y % 2:
+                self.MT[i] = self.MT[i] ^ 0x9908b0df
+
+    def rand(self):
+        if self.idx == 0:
+            self.generate()
+
+        y = self.MT[self.idx]
+        y = y ^ (y >> 11)
+        y = y ^ ((y << 7) & 0x9d2c5680)
+        y = y ^ ((y << 15) & 0xefc60000)
+        y = y ^ (y >> 18)
+
+        self.idx = (self.idx + 1) % 624
+        return y
+
+
+
 def cc17():
     """17. The CBC padding oracle
 
@@ -464,6 +495,9 @@ in Python, Ruby, or (gah) PHP, your language is probably already
 giving you MT19937 as "rand()"; don't use rand(). Write the RNG
 yourself.
 """
+    rng = MersenneTwister(1)
+    for i in xrange(16):
+        print rng.rand()
 
 
 def cc22():
