@@ -48,21 +48,19 @@ attacker has the ciphertext and controls the offset and "new text".
 
 Recover the original plaintext.
 """
+    #UNUSED: edit by decrypting first
+    def edit_decrypt(key, nonce, ciphertext, offset, data):
+        plain = xor_aes_ctr(key, nonce, ciphertext)
+        data = ''.join((plain[:offset], data, plain[offset + len(data):]))
+        return xor_aes_ctr(key, nonce, data)
+
+    #don't really need to decrypt - just shift data, encrypt, and splice
     def edit(key, nonce, ciphertext, offset, data):
         edittext = xor_aes_ctr(key, nonce, '\00' * offset + data)
         return ''.join((ciphertext[:offset], edittext[offset:], ciphertext[offset + len(data):]))
 
-    with open('data/cc07.txt') as f:
-        ciphertext = f.read().decode('base64')
-    data = AES.new("YELLOW SUBMARINE", mode=AES.MODE_ECB).decrypt(ciphertext)
-
-    key = random_key(16)
-    nonce = random.randint(0, sys.maxint)
-    ciphertext = xor_aes_ctr(key, nonce, data)
-    fedit = partial(edit, key, nonce)
-
-    #decrypt byte-by-byte
-    def decrypt_slow(ciphertext, fedit):
+    #UNUSED: decrypt byte-by-byte (works, but slowly)
+    def decrypt_bytes(ciphertext, fedit):
         output = ''
         chars = [chr(x) for x in xrange(256)]
         for i,x in enumerate(ciphertext):
@@ -77,6 +75,14 @@ Recover the original plaintext.
         keystream = fedit(ciphertext, 0, '\00' * len(ciphertext))
         return xor_block(keystream, ciphertext)
 
+    with open('data/cc07.txt') as f:
+        ciphertext = f.read().decode('base64')
+    data = AES.new("YELLOW SUBMARINE", mode=AES.MODE_ECB).decrypt(ciphertext)
+
+    key = random_key(16)
+    nonce = random.randint(0, sys.maxint)
+    ciphertext = xor_aes_ctr(key, nonce, data)
+    fedit = partial(edit, key, nonce)
     print decrypt(ciphertext, fedit)
 
 
