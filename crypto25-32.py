@@ -1,9 +1,31 @@
 #!/usr/bin/env python
+from functools import partial
+import itertools
 import random
+import struct
+import sys
 
 from Crypto.Cipher import AES
 
 random.seed('matasano') #for reproducibility - will work with any seed
+
+
+def random_key(keylen):
+    return ''.join(chr(random.randint(0,255)) for _ in xrange(keylen))
+
+
+def xor_block(b1, b2):
+    return ''.join(chr(ord(x) ^ ord(y)) for x,y in zip(b1, b2))
+
+
+def xor_aes_ctr(key, nonce, data):
+    def gen_keystream():
+        aes = AES.new(key, mode=AES.MODE_ECB)
+        for i in itertools.count():
+            for c in aes.encrypt(struct.pack('<QQ', nonce, i)):
+                yield c
+
+    return ''.join(chr(ord(x) ^ ord(y)) for x,y in itertools.izip(data, gen_keystream()))
 
 
 def cc25():
@@ -26,6 +48,30 @@ attacker has the ciphertext and controls the offset and "new text".
 
 Recover the original plaintext.
 """
+    def edit(key, nonce, ciphertext, offset, data):
+        edittext = xor_aes_ctr(key, nonce, '\00' * offset + data)
+        return ''.join((ciphertext[:offset], edittext[offset:], ciphertext[offset + len(data):]))
+
+    with open('data/cc07.txt') as f:
+        ciphertext = f.read().decode('base64')
+    data = AES.new("YELLOW SUBMARINE", mode=AES.MODE_ECB).decrypt(ciphertext)
+
+    key = random_key(16)
+    nonce = random.randint(0, sys.maxint)
+    ciphertext = xor_aes_ctr(key, nonce, data)
+    fedit = partial(edit, key, nonce)
+
+    def decrypt(ciphertext, fedit):
+        output = ''
+        chars = [chr(x) for x in xrange(256)]
+        for i,x in enumerate(ciphertext):
+            for c in chars:
+                if fedit(ciphertext, i, c)[i] == x:
+                    output += c
+                    break
+        return output
+
+    print decrypt(ciphertext, fedit)
 
 
 def cc26():
