@@ -45,13 +45,14 @@ def pkcs7_strip(data):
 
 
 #https://github.com/ajalt/python-sha1
-def sha1(message):
+def sha1(message, h0=0x67452301, h1=0xEFCDAB89, h2=0x98BADCFE, h3=0x10325476, h4=0xC3D2E1F0):
     """SHA-1 Hashing Function
 
     A custom SHA-1 hashing function implemented entirely in Python.
 
     Arguments:
         message: The input message string to hash.
+        h0 ... h4: initial variables
 
     Returns:
         A hex SHA-1 digest of the input message.
@@ -59,13 +60,6 @@ def sha1(message):
 
     def _left_rotate(n, b):
         return ((n << b) | (n >> (32 - b))) & 0xffffffff
-
-    # Initialize variables:
-    h0 = 0x67452301
-    h1 = 0xEFCDAB89
-    h2 = 0x98BADCFE
-    h3 = 0x10325476
-    h4 = 0xC3D2E1F0
 
     # Pre-processing:
     original_byte_len = len(message)
@@ -123,6 +117,7 @@ def sha1(message):
         h4 = (h4 + e) & 0xffffffff
 
     # Produce the final hash value (big-endian):
+    print (h0, h1, h2, h3, h4)
     return '%08x%08x%08x%08x%08x' % (h0, h1, h2, h3, h4)
 
 
@@ -358,6 +353,26 @@ string:
 
 Forge a variant of this message that ends with ";admin=true".
 """
+    def sha1_pad(message):
+        # Pre-processing:
+        original_byte_len = len(message)
+        original_bit_len = original_byte_len * 8
+        # append the bit '1' to the message
+        pad = '\x80'
+
+        # append 0 <= k < 512 bits '0', so that the resulting message length (in bits)
+        #    is congruent to 448 (mod 512)
+        pad += '\x00' * ((56 - (original_byte_len + 1) % 64) % 64)
+
+        # append length of message (before pre-processing), in bits, as 64-bit big-endian integer
+        pad += struct.pack('>Q', original_bit_len)
+        return pad
+
+    key = random.choice(open('/usr/share/dict/words').readlines())
+    message = "comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon"
+    mac = sha1(key + message)
+    print key, mac
+    
 
 
 def cc30():
