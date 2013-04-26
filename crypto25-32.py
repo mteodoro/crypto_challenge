@@ -28,6 +28,22 @@ def xor_aes_ctr(key, nonce, data):
     return ''.join(chr(ord(x) ^ ord(y)) for x,y in itertools.izip(data, gen_keystream()))
 
 
+def pkcs7_pad(blocklen, data):
+    padlen = blocklen - len(data) % blocklen
+    return data + chr(padlen) * padlen
+
+
+class PadException(Exception):
+        pass
+
+def pkcs7_strip(data):
+    padchar = data[-1]
+    padlen = ord(padchar)
+    if padlen == 0 or not data.endswith(padchar * padlen):
+        raise PadException
+    return data[:-padlen]
+
+
 def cc25():
     """25. Break "random access read/write" AES CTR
 
@@ -155,6 +171,28 @@ key:
 
  P'_1 XOR P'_3
 """
+    def encrypt(key, iv, data):
+        prefix = "comment1=cooking%20MCs;userdata="
+        suffix = ";comment2=%20like%20a%20pound%20of%20bacon"
+        for c in ';=':
+            data = data.replace(c, '%%%X' % ord(c))
+        data = pkcs7_pad(16, prefix + data + suffix)
+        return AES.new(key, mode=AES.MODE_CBC, IV=iv).encrypt(data)
+
+    def decrypt(key, iv, data):
+        plain = pkcs7_strip(AES.new(key, mode=AES.MODE_CBC, IV=iv).decrypt(data))
+        if all(ord(c) < 128 for c in plain):
+            return True, plain
+        return False, plain
+
+    key = iv = random_key(16)
+    print "Key %s == IV %s" % (key.encode('hex'), iv.encode('hex'))
+
+    ciphertext = encrypt(key, iv, 'Ice')
+    attacktext = ''.join((ciphertext[:16], '\00' * 16, ciphertext[:16], ciphertext[48:]))
+    ok, plain = decrypt(key, iv, attacktext)
+    keyiv = xor_block(plain[:16], plain[32:48])
+    print "Recovered Key/IV: %s" % keyiv.encode('hex')
 
 
 def cc28():
