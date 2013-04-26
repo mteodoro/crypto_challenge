@@ -24,7 +24,7 @@ class PadException(Exception):
 def pkcs7_strip(data):
     padchar = data[-1]
     padlen = ord(padchar)
-    if not data.endswith(padchar * padlen):
+    if padlen == 0 or not data.endswith(padchar * padlen):
         raise PadException
     return data[:-padlen]
 
