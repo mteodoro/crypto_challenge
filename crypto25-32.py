@@ -95,6 +95,29 @@ bit flipping attacks of the kind to which CBC mode is susceptible.
 Re-implement the CBC bitflipping exercise (16) from earlier to use CTR mode
 instead of CBC mode. Inject an "admin=true" token.
 """
+    def encrypt(key, nonce, data):
+        prefix = "comment1=cooking%20MCs;userdata="
+        suffix = ";comment2=%20like%20a%20pound%20of%20bacon"
+        for c in ';=':
+            data = data.replace(c, '%%%X' % ord(c))
+        data = ''.join((prefix, data, suffix))
+        return xor_aes_ctr(key, nonce, data)
+
+    data = '?admin?true'
+    print 'Input:', data
+
+    key = random_key(16)
+    nonce = random.randint(0, sys.maxint)
+    ciphertext = encrypt(key, nonce, data)
+
+    ciphertext = list(ciphertext)
+    ciphertext[32] = chr(ord(ciphertext[32]) ^ (ord('?') ^ ord(';')))
+    ciphertext[38] = chr(ord(ciphertext[38]) ^ (ord('?') ^ ord('=')))
+    ciphertext = ''.join(ciphertext)
+
+    plain = xor_aes_ctr(key, nonce, ciphertext)
+    print 'Output:', plain
+    print "Found ';admin=true;':", ';admin=true;' in plain
 
 
 def cc27():
