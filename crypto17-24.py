@@ -10,7 +10,7 @@ import time
 
 from Crypto.Cipher import AES
 
-random.seed('matasano')
+random.seed('matasano') #for reproducibility - will work with any seed
 
 
 #http://docs.python.org/2/library/itertools.html#recipes
@@ -102,7 +102,6 @@ def score_decodings(keys, fscore, data):
     return sorted(scores, reverse=True)
 
 
-#Tested output against https://github.com/cslarsen/mersenne-twister
 class MersenneTwister(object):
     def __init__(self, seed):
         self.idx = 0
@@ -133,7 +132,6 @@ class MersenneTwister(object):
 
     def snoop(self):
         print "MT[%s]: %s" % (self.idx, self.MT[self.idx])
-
 
 
 def cc17():
@@ -500,7 +498,6 @@ giving you MT19937 as "rand()"; don't use rand(). Write the RNG
 yourself.
 """
     print "First 16 outputs with seed=1"
-
     rng = MersenneTwister(1)
     for i in xrange(16):
         print rng.rand()
@@ -541,7 +538,6 @@ From the 32 bit RNG output, discover the seed.
             time.sleep(wait)
         return tnow, rng.rand()
 
-    #tnow, output = get_number(5, 10)
     tnow, output = get_number(40, 1000, fast=True)
     print 'Output:', output
 
@@ -672,8 +668,7 @@ the product of an MT19937 PRNG seeded with the current time.
     seed = random.randint(0, 0xFFFF)
     print "Seed:", seed
     prefix = random_key(random.randint(1,32))
-    fcrypt = partial(encrypt, seed, prefix)
-    ciphertext = fcrypt('A' * 14)
+    ciphertext = encrypt(seed, prefix, 'A' * 14)
 
     #find the last chunk of ciphertext that aligns with a full int from the RNG
     blocklen = 4
@@ -690,7 +685,28 @@ the product of an MT19937 PRNG seeded with the current time.
             r = rng.rand()
         if r == key:
             print 'Found seed:', seed
+            print
             break
+
+    def reset_token():
+        return xor_mt_ctr(int(time.time()), 'YELLOW SUBMARINE').encode('hex')
+
+    def check_reset(token, grace):
+        tnow = int(time.time())
+        token = token.decode('hex')
+        for seed in xrange(tnow - grace, tnow + grace):
+            if xor_mt_ctr(seed, token) == 'YELLOW SUBMARINE':
+                return True
+        return False
+
+    print "Generate a token and check it with a grace period of +- 5 minutes"
+    print "Good Token:"
+    token = reset_token()
+    print token, check_reset(token, 300)
+
+    print "Bad Token:"
+    token = random_key(16).encode('hex')
+    print token, check_reset(token, 300)
 
 
 if __name__ == '__main__':
