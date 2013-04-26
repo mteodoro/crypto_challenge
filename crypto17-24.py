@@ -659,9 +659,38 @@ the product of an MT19937 PRNG seeded with the current time.
 
         return ''.join(chr(ord(x) ^ ord(y)) for x,y in itertools.izip(data, gen_keystream()))
 
-    data = 'YELLOW SUBMARINE'
-    cipher = xor_mt_ctr(0, data)
-    print xor_mt_ctr(0, cipher)
+    #test xor_mt_ctr()
+    seed = random.randint(0, 0xFFFFFFFF)
+    ok = xor_mt_ctr(seed, xor_mt_ctr(seed, 'YELLOW SUBMARINE')) == 'YELLOW SUBMARINE'
+    print "xor_mt_ctr(%s, xor_mt_ctr(%s, 'YELLOW SUBMARINE')) == 'YELLOW SUBMARINE': %s" % (seed, seed, ok)
+    print
+
+    def encrypt(seed, prefix, data):
+        return xor_mt_ctr(seed, prefix + data)
+
+    #generate a seed and use it to encrypt some random bytes + 'A' * 14
+    seed = random.randint(0, 0xFFFF)
+    print "Seed:", seed
+    prefix = random_key(random.randint(1,32))
+    fcrypt = partial(encrypt, seed, prefix)
+    ciphertext = fcrypt('A' * 14)
+
+    #find the last chunk of ciphertext that aligns with a full int from the RNG
+    blocklen = 4
+    rounds = len(ciphertext) / blocklen
+    ridx = len(ciphertext) % 4
+    start = len(ciphertext) - (ridx + blocklen)
+    end = len(ciphertext) - ridx
+    key = struct.unpack('!I', xor_block(ciphertext[start:end], 'AAAA'))[0]
+
+    #brute-force search all seeds to see which one matches key after 'rounds' rounds
+    for seed in xrange(0, 0xFFFF + 1):
+        rng = MersenneTwister(seed)
+        for _ in xrange(rounds):
+            r = rng.rand()
+        if r == key:
+            print 'Found seed:', seed
+            break
 
 
 if __name__ == '__main__':
