@@ -61,7 +61,8 @@ Recover the original plaintext.
     ciphertext = xor_aes_ctr(key, nonce, data)
     fedit = partial(edit, key, nonce)
 
-    def decrypt(ciphertext, fedit):
+    #decrypt byte-by-byte
+    def decrypt_slow(ciphertext, fedit):
         output = ''
         chars = [chr(x) for x in xrange(256)]
         for i,x in enumerate(ciphertext):
@@ -70,6 +71,11 @@ Recover the original plaintext.
                     output += c
                     break
         return output
+
+    #recover keystream by 'editing' with ciphertext worth of 0
+    def decrypt(ciphertext, fedit):
+        keystream = fedit(ciphertext, 0, '\00' * len(ciphertext))
+        return xor_block(keystream, ciphertext)
 
     print decrypt(ciphertext, fedit)
 
