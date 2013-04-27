@@ -81,8 +81,6 @@ def sha1(message, h0=0x67452301, h1=0xEFCDAB89, h2=0x98BADCFE, h3=0x10325476, h4
 
     # append length of message (before pre-processing), in bits, as 64-bit big-endian integer
     message += struct.pack('>Q', original_bit_len + (offset * 8))
-    ###print 'message len', len(message)
-    ###print message.encode('hex')
 
     # Process the message in successive 512-bit chunks:
     # break message into 512-bit chunks
@@ -382,36 +380,24 @@ Forge a variant of this message that ends with ";admin=true".
     key = random.choice(open('/usr/share/dict/words').readlines()).strip()
     message = "comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon"
     mac = sha1(key + message)
-    print key, len(key), mac, authenticate(key, mac, message)
+    print 'Message:', message
+    print 'MAC:', mac
+    print 'Authenticated:', authenticate(key, mac, message)
+    print
 
-    hvalues = [int(''.join(h), 16) for h in grouper(8, mac)]
-
+    registers = [int(''.join(h), 16) for h in grouper(8, mac)]
     suffix = ';admin=true'
-    print
-    print
-    attack_mac = sha1(suffix, *hvalues, offset=128)
-    print 'attack', attack_mac
-    print
-    final_mac = sha1(key + message + sha1_pad(key + message) + suffix)
-    print 'final ', final_mac
-
-    print 'padlen', len(message + sha1_pad(key + message))
-
-    print sha1_pad(message).encode('hex')
-    pad = sha1_pad(key + message)
-    print pad.encode('hex')
-    print 'padlen2:', len(message + pad)
-
 
     for keylen in xrange(0, 256):
         pad = sha1_pad(('A' * keylen) + message)
-        attack_mac = sha1(suffix, *hvalues, offset=keylen + len(message + pad))
+        offset = keylen + len(message + pad)
+        attack_mac = sha1(suffix, *registers, offset=offset)
         attack_msg = message + pad + suffix
         if authenticate(key, attack_mac, attack_msg):
-            print 'found', keylen, pad
+            print 'Message:', attack_msg
+            print 'MAC:', attack_mac
+            print 'Authenticated:', authenticate(key, attack_mac, attack_msg)
             break
-    else:
-        print 'not found'
 
 
 def cc30():
