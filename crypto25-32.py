@@ -10,6 +10,14 @@ from Crypto.Cipher import AES
 random.seed('matasano') #for reproducibility - will work with any seed
 
 
+#http://docs.python.org/2/library/itertools.html#recipes
+def grouper(n, iterable, fillvalue=None):
+    "Collect data into fixed-length chunks or blocks"
+    # grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx
+    args = [iter(iterable)] * n
+    return itertools.izip_longest(fillvalue=fillvalue, *args)
+
+
 def random_key(keylen):
     return ''.join(chr(random.randint(0,255)) for _ in xrange(keylen))
 
@@ -45,7 +53,7 @@ def pkcs7_strip(data):
 
 
 #https://github.com/ajalt/python-sha1
-def sha1(message, h0=0x67452301, h1=0xEFCDAB89, h2=0x98BADCFE, h3=0x10325476, h4=0xC3D2E1F0):
+def sha1(message, h0=0x67452301, h1=0xEFCDAB89, h2=0x98BADCFE, h3=0x10325476, h4=0xC3D2E1F0, offset=0):
     """SHA-1 Hashing Function
 
     A custom SHA-1 hashing function implemented entirely in Python.
@@ -72,7 +80,10 @@ def sha1(message, h0=0x67452301, h1=0xEFCDAB89, h2=0x98BADCFE, h3=0x10325476, h4
     message += '\x00' * ((56 - (original_byte_len + 1) % 64) % 64)
 
     # append length of message (before pre-processing), in bits, as 64-bit big-endian integer
-    message += struct.pack('>Q', original_bit_len)
+    message += struct.pack('>Q', original_bit_len + (offset * 8))
+    ###print 'message len', len(message)
+    ###print message.encode('hex')
+
     # Process the message in successive 512-bit chunks:
     # break message into 512-bit chunks
     for i in xrange(0, len(message), 64):
@@ -117,8 +128,11 @@ def sha1(message, h0=0x67452301, h1=0xEFCDAB89, h2=0x98BADCFE, h3=0x10325476, h4
         h4 = (h4 + e) & 0xffffffff
 
     # Produce the final hash value (big-endian):
-    print (h0, h1, h2, h3, h4)
     return '%08x%08x%08x%08x%08x' % (h0, h1, h2, h3, h4)
+
+
+def authenticate(key, mac, message):
+    return sha1(key + message) == mac
 
 
 def cc25():
@@ -289,9 +303,6 @@ Verify that you cannot tamper with the message without breaking the
 MAC you've produced, and that you can't produce a new MAC without
 knowing the secret key.
 """
-    def authenticate(key, mac, message):
-        return sha1(key + message) == mac
-
     tests = [
         ('Original:', 'YELLOW SUBMARINE', "My posse's to the side yellin', Go Vanilla Go!"),
         ('Bad Key: ', 'ORANGE SUBMARINE', "My posse's to the side yellin', Go Vanilla Go!"),
@@ -368,11 +379,39 @@ Forge a variant of this message that ends with ";admin=true".
         pad += struct.pack('>Q', original_bit_len)
         return pad
 
-    key = random.choice(open('/usr/share/dict/words').readlines())
+    key = random.choice(open('/usr/share/dict/words').readlines()).strip()
     message = "comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon"
     mac = sha1(key + message)
-    print key, mac
-    
+    print key, len(key), mac, authenticate(key, mac, message)
+
+    hvalues = [int(''.join(h), 16) for h in grouper(8, mac)]
+
+    suffix = ';admin=true'
+    print
+    print
+    attack_mac = sha1(suffix, *hvalues, offset=128)
+    print 'attack', attack_mac
+    print
+    final_mac = sha1(key + message + sha1_pad(key + message) + suffix)
+    print 'final ', final_mac
+
+    print 'padlen', len(message + sha1_pad(key + message))
+
+    print sha1_pad(message).encode('hex')
+    pad = sha1_pad(key + message)
+    print pad.encode('hex')
+    print 'padlen2:', len(message + pad)
+
+
+    for keylen in xrange(0, 256):
+        pad = sha1_pad(('A' * keylen) + message)
+        attack_mac = sha1(suffix, *hvalues, offset=keylen + len(message + pad))
+        attack_msg = message + pad + suffix
+        if authenticate(key, attack_mac, attack_msg):
+            print 'found', keylen, pad
+            break
+    else:
+        print 'not found'
 
 
 def cc30():
