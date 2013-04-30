@@ -45,6 +45,14 @@ md4_test= [
      ]
 
 
+def md4_hash(data, A=0x67452301L, B=0xefcdab89L, C=0x98badcfeL, D=0x10325476L, offset=0):
+    h = MD4(A, B, C, D)
+    h.update(data, offset)
+    return h.digest()
+
+def hexdigest(digest):
+    return ''.join('%02x' % ord(i) for i in digest)
+
 class MD4:
     A = None
     B = None
@@ -54,13 +62,11 @@ class MD4:
     buf = []
 
     #-----------------------------------------------------
-    def __init__(self):
-
-
-        self.A = U32(0x67452301L)
-        self.B = U32(0xefcdab89L)
-        self.C = U32(0x98badcfeL)
-        self.D = U32(0x10325476L)
+    def __init__(self, A=0x67452301L, B=0xefcdab89L, C=0x98badcfeL, D=0x10325476L):
+        self.A = U32(A)
+        self.B = U32(B)
+        self.C = U32(C)
+        self.D = U32(D)
         self.count, self.len1, self.len2 = U32(0L), U32(0L), U32(0L)
         self.buf = [0x00] * 64
 
@@ -92,7 +98,7 @@ class MD4:
         return dest
 
     #-----------------------------------------------------
-    def update(self, str):
+    def update(self, str, offset=0):
 
         buf = []
         for i in str: buf.append(ord(i))
@@ -103,8 +109,8 @@ class MD4:
         if (long(self.len1 + (ilen << 3)) < long(self.len1)):
             self.len2 = self.len2 + U32(1)
 
-        self.len1 = self.len1 + (ilen << 3)
-        self.len2 = self.len2 + (ilen >> 29)
+        self.len1 = self.len1 + ((ilen + offset) << 3)
+        self.len2 = self.len2 + ((ilen + offset) >> 29)
 
         L = U32(0)
         bufpos = 0
@@ -187,7 +193,7 @@ class MD4:
                 self.D = self.D + D
 
     #-----------------------------------------------------
-    def _digest(self):
+    def digest(self):
 
         res = [0x00] * 16
         s = [0x00] * 8
@@ -231,14 +237,7 @@ class MD4:
         res[14]=(temp.D >> 16) & U32(0xFF)
         res[15]=(temp.D >> 24) & U32(0xFF)
 
-        return res
-
-    def digest(self):
-        return int_array2str(self._digest())
-
-    def hexdigest(self):
-        res = self._digest()
-        return ''.join('%02x' % int(i) for i in res)
+        return int_array2str(res)
 
 #====================================================================
 # helpers
@@ -300,6 +299,7 @@ class U32:
     #--------------------------------------------------------------------
     def __add__(self, b):
         r = U32()
+        b = U32(b)
         r.v = C + norm(self.v + b.v)
         return r
 
@@ -391,4 +391,4 @@ class U32:
     #--------------------------------------------------------------------
     def __nonzero__(self):
         return norm(self.v)
-        
+

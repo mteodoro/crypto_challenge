@@ -8,6 +8,7 @@ import sys
 from Crypto.Cipher import AES
 
 import md4
+from md4 import int_array2str, U32
 
 random.seed('matasano') #for reproducibility - will work with any seed
 
@@ -410,16 +411,57 @@ done this attack once against SHA-1, the MD4 variant should take much
 less time; mostly just the time you'll spend Googling for an
 implementation of MD4.
 """
-    def md4_hash(data):
-        h = md4.MD4()
-        h.update(data)
-        return h.digest()
+    def md4_pad(message):
+        s = [0x00] * 8
+        padding = [0x00] * 64
+        padding[0] = 0x80
+        padlen, _, _ = U32(0), U32(0), U32(0)
+
+        ilen = U32(len(message))
+        len1 = ilen << 3
+        len2 = ilen >> 29
+
+        if (56 <= long(ilen)): padlen = U32(56 - long(ilen) + 64)
+        else: padlen = U32(56 - long(ilen))
+
+        pad = int_array2str(padding[:int(padlen)])
+
+        s[0]= (len1)        & U32(0xFF)
+        s[1]=((len1) >>  8) & U32(0xFF)
+        s[2]=((len1) >> 16) & U32(0xFF)
+        s[3]=((len1) >> 24) & U32(0xFF)
+        s[4]= (len2)        & U32(0xFF)
+        s[5]=((len2) >>  8) & U32(0xFF)
+        s[6]=((len2) >> 16) & U32(0xFF)
+        s[7]=((len2) >> 24) & U32(0xFF)
+        pad += int_array2str(s)
+        return pad
+
+    def authenticate(key, mac, message):
+        return md4.md4_hash(key + message) == mac
 
     key = random.choice(open('/usr/share/dict/words').readlines()).strip()
     message = "comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon"
-    mac = md4_hash(key + message)
+    mac = md4.md4_hash(key + message)
     print 'Message:', message
-    print 'MAC:', mac
+    print 'MAC:', md4.hexdigest(mac)
+    print 'Authenticated:', authenticate(key, mac, message)
+    print
+
+    registers = struct.unpack('<LLLL', mac)
+    suffix = ';admin=true'
+
+    for keylen in xrange(0, 256):
+        pad = md4_pad(('A' * keylen) + message)
+        #print repr(pad)
+        offset = keylen + len(message + pad)
+        attack_mac = md4.md4_hash(suffix, *registers, offset=offset)
+        attack_msg = message + pad + suffix
+        if authenticate(key, attack_mac, attack_msg):
+            print 'Message:', attack_msg
+            print 'MAC:', md4.hexdigest(attack_mac)
+            print 'Authenticated:', authenticate(key, attack_mac, attack_msg)
+            break
 
 
 def cc31():
