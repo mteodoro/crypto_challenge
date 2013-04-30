@@ -7,6 +7,8 @@ import sys
 
 from Crypto.Cipher import AES
 
+import md4
+
 random.seed('matasano') #for reproducibility - will work with any seed
 
 
@@ -408,6 +410,16 @@ done this attack once against SHA-1, the MD4 variant should take much
 less time; mostly just the time you'll spend Googling for an
 implementation of MD4.
 """
+    def md4_hash(data):
+        h = md4.MD4()
+        h.update(data)
+        return h.digest()
+
+    key = random.choice(open('/usr/share/dict/words').readlines()).strip()
+    message = "comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon"
+    mac = md4_hash(key + message)
+    print 'Message:', message
+    print 'MAC:', mac
 
 
 def cc31():
