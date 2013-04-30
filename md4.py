@@ -187,7 +187,7 @@ class MD4:
                 self.D = self.D + D
 
     #-----------------------------------------------------
-    def digest(self):
+    def _digest(self):
 
         res = [0x00] * 16
         s = [0x00] * 8
@@ -231,7 +231,14 @@ class MD4:
         res[14]=(temp.D >> 16) & U32(0xFF)
         res[15]=(temp.D >> 24) & U32(0xFF)
 
-        return int_array2str(res)
+        return res
+
+    def digest(self):
+        return int_array2str(self._digest())
+
+    def hexdigest(self):
+        res = self._digest()
+        return ''.join('%02x' % int(i) for i in res)
 
 #====================================================================
 # helpers
