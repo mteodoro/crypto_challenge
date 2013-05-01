@@ -164,7 +164,7 @@ Recover the original plaintext.
 
     #don't really need to decrypt - just shift data, encrypt, and splice
     def edit(key, nonce, ciphertext, offset, data):
-        edittext = xor_aes_ctr(key, nonce, '\00' * offset + data)
+        edittext = xor_aes_ctr(key, nonce, '\x00' * offset + data)
         return ''.join((ciphertext[:offset], edittext[offset:], ciphertext[offset + len(data):]))
 
     #UNUSED: decrypt byte-by-byte (works, but slowly)
@@ -180,7 +180,7 @@ Recover the original plaintext.
 
     #recover keystream by 'editing' with ciphertext worth of 0
     def decrypt(ciphertext, fedit):
-        keystream = fedit(ciphertext, 0, '\00' * len(ciphertext))
+        keystream = fedit(ciphertext, 0, '\x00' * len(ciphertext))
         return xor_block(keystream, ciphertext)
 
     with open('data/cc07.txt') as f:
@@ -281,7 +281,7 @@ key:
     print "Key %s == IV %s" % (key.encode('hex'), iv.encode('hex'))
 
     ciphertext = encrypt(key, iv, 'Ice')
-    attacktext = ''.join((ciphertext[:16], '\00' * 16, ciphertext[:16], ciphertext[48:]))
+    attacktext = ''.join((ciphertext[:16], '\x00' * 16, ciphertext[:16], ciphertext[48:]))
     ok, plain = decrypt(key, iv, attacktext)
     keyiv = xor_block(plain[:16], plain[32:48])
     print "Recovered Key/IV: %s" % keyiv.encode('hex')
