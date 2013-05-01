@@ -4,8 +4,7 @@ import itertools
 import random
 import struct
 import sys
-import hashlib
-import hmac
+import urllib
 
 from Crypto.Cipher import AES
 
@@ -497,21 +496,14 @@ the MAC is invalid, and a 200 if it's OK.
 Using the timing leak in this application, write a program that
 discovers the valid MAC for any file.
 """
-    def hmac_sha1(key, message):
-        sha1 = lambda data: hashlib.sha1(data).digest()
-        if len(key) > 64:
-            key = sha1(key)
-        key += '\x00' * (64 - len(key))
+    def status(url):
+        r = urllib.urlopen(url)
+        return r.getcode()
 
-        o_key_pad = xor_block('\x5c' * 64, key)
-        i_key_pad = xor_block('\x36' * 64, key)
-        return sha1(o_key_pad + sha1(i_key_pad + message))
+    fname = random.choice(open('/usr/share/dict/words').readlines()).strip()
 
-    tests = [('', ''), ('A' * 10, 'Ice'), ('A' * 64, 'Ice'), ('A' * 70, 'Ice')]
-    for key,msg in tests:
-        hm1 = hmac_sha1(key, msg)
-        hm2 =  hmac.new(key, msg, hashlib.sha1).digest()
-        print hm1 == hm2, key, msg
+    print status("http://localhost:9000/test31?file=foo&signature=848808b08cb5067fcfbee47f6b109f898fdeaba9")
+    print status("http://localhost:9000/test31?file=foo&signature=848808b08cb5067fcfbee47f6b109f898fXXXXXX")
 
 
 def cc32():
