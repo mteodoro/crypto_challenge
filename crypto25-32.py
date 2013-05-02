@@ -5,6 +5,7 @@ import random
 import struct
 import sys
 import urllib
+import time
 
 from Crypto.Cipher import AES
 
@@ -496,14 +497,33 @@ the MAC is invalid, and a 200 if it's OK.
 Using the timing leak in this application, write a program that
 discovers the valid MAC for any file.
 """
-    def status(url):
+    def get_status(url):
         r = urllib.urlopen(url)
         return r.getcode()
 
-    fname = random.choice(open('/usr/share/dict/words').readlines()).strip()
+    def recover_sig(url, fname):
+        baseurl = url + '?file=%s&signature=%%s' % fname
+        sig = ''
+        while len(sig) < 40:
+            c_time = {}
+            for c in '0123456789abcdef':
+                url = baseurl % sig + c
+                tstart = time.time()
+                get_status(url)
+                tstop = time.time()
+                c_time[c] = tstop - tstart
+            t,c = max((t,c) for c,t in c_time.iteritems())
+            sig += c
+            print sig
+        return sig
 
-    print status("http://localhost:9000/test31?file=foo&signature=848808b08cb5067fcfbee47f6b109f898fdeaba9")
-    print status("http://localhost:9000/test31?file=foo&signature=848808b08cb5067fcfbee47f6b109f898fXXXXXX")
+
+    url = 'http://localhost:9000/test31'
+    fname = random.choice(open('/usr/share/dict/words').readlines()).strip()
+    sig = recover_sig(url, fname)
+    url = url + '?file=%s&signature=%s' % (fname, sig)
+    status = get_status(url)
+    print status, fname, sig
 
 
 def cc32():
