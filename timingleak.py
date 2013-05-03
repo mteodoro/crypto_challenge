@@ -43,10 +43,17 @@ def insecure_compare(sleep_secs, lhs, rhs):
 
 
 @route('/test31')
-def test():
+def test31():
     fname, sig = request.query.file, request.query.signature
     #return 'OK' if hmac_sha1(key, fname) == sig else abort(500)
     return 'OK' if insecure_compare(0.05, hmac_sha1(key, fname), sig) else abort(500)
+
+
+@route('/test32')
+def test32():
+    fname, sig = request.query.file, request.query.signature
+    #return 'OK' if hmac_sha1(key, fname) == sig else abort(500)
+    return 'OK' if insecure_compare(0.005, hmac_sha1(key, fname), sig) else abort(500)
 
 
 if __name__ == '__main__':

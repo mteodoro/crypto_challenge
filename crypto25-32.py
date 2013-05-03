@@ -57,6 +57,14 @@ def pkcs7_strip(data):
     return data[:-padlen]
 
 
+def get_status(url):
+    r = urllib.urlopen(url)
+    status = r.getcode()
+    r.read()
+    r.close()
+    return status
+
+
 #https://github.com/ajalt/python-sha1
 def sha1(message, h0=0x67452301, h1=0xEFCDAB89, h2=0x98BADCFE, h3=0x10325476, h4=0xC3D2E1F0, offset=0):
     """SHA-1 Hashing Function
@@ -497,10 +505,6 @@ the MAC is invalid, and a 200 if it's OK.
 Using the timing leak in this application, write a program that
 discovers the valid MAC for any file.
 """
-    def get_status(url):
-        r = urllib.urlopen(url)
-        return r.getcode()
-
     def recover_sig(url, fname):
         baseurl = url + '?file=%s&signature=%%s' % fname
         sig = ''
@@ -520,6 +524,7 @@ discovers the valid MAC for any file.
 
     url = 'http://localhost:9000/test31'
     fname = random.choice(open('/usr/share/dict/words').readlines()).strip()
+    print 'Finding HMAC for:', fname
     sig = recover_sig(url, fname)
     url = url + '?file=%s&signature=%s' % (fname, sig)
     status = get_status(url)
@@ -534,6 +539,32 @@ solution breaks. (Try 5ms to start.)
 
 Now break it again.
 """
+    print "5ms: do 5 rounds to increase delta between good and bad times"
+
+    def recover_sig(url, fname):
+        baseurl = url + '?file=%s&signature=%%s' % fname
+        sig = ''
+        while len(sig) < 40:
+            c_time = {}
+            for c in '0123456789abcdef':
+                url = baseurl % sig + c
+                tstart = time.time()
+                for _ in xrange(5):
+                    get_status(url)
+                tstop = time.time()
+                c_time[c] = tstop - tstart
+            t,c = max((t,c) for c,t in c_time.iteritems())
+            sig += c
+            print sig
+        return sig
+
+    url = 'http://localhost:9000/test32'
+    fname = random.choice(open('/usr/share/dict/words').readlines()).strip()
+    print 'Finding HMAC for:', fname
+    sig = recover_sig(url, fname)
+    url = url + '?file=%s&signature=%s' % (fname, sig)
+    status = get_status(url)
+    print status, fname, sig
 
 
 if __name__ == '__main__':
