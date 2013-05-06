@@ -8,7 +8,7 @@ from Crypto.Cipher import AES
 
 random.seed('matasano') #for reproducibility - will work with any seed
 
-p = int(''.join("""
+nist_p = int(''.join("""
 ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024
 e088a67cc74020bbea63b139b22514a08798e3404ddef9519b3cd
 3a431b302b0a6df25f14374fe1356d6d51c245e485b576625e7ec
@@ -17,7 +17,7 @@ e088a67cc74020bbea63b139b22514a08798e3404ddef9519b3cd
 c55d39a69163fa8fd24cf5f83655d23dca3ad961c62f356208552
 bb9ed529077096966d670c354e4abc9804f1746c08ca237327fff
 fffffffffffff""".strip().split()), 16)
-g = 2
+nist_g = 2
 
 
 #modified from http://docs.python.org/2/library/itertools.html#recipes
@@ -113,6 +113,7 @@ math, don't freak out), because you'll blow out your bignum library
 raising "a" to the 1024-bit-numberth power. You can find modexp
 routines on Rosetta Code for most languages.
 """
+    p, g = nist_p, nist_g
     #p, g = 37, 5
     print 'p:', p
     print 'g:', g
@@ -128,7 +129,7 @@ routines on Rosetta Code for most languages.
     print 's1 == s2:', s1 == s2
     print
 
-    s1key, s1mac = grouper(16, sha256(hex(s1)[2:]).digest())
+    s1key, s1mac = grouper(16, sha256('%02x' % s1).digest())
     print 'key:', s1key.encode('hex'), 'mac:', s1mac.encode('hex')
 
 
@@ -172,14 +173,13 @@ this attack work; you could just generate Ma, MA, Mb, and MB as valid
 DH parameters to do a generic MITM attack. But do the parameter
 injection attack; it's going to come up again.
 """
+    p, g = nist_p, nist_g
     #p, g = 37, 5
-
-    def alice():
+    def alice(p, g, msg):
         a, A = make_keys(p, g)
         B = (yield p, g, A)
         s = pow(B, a, p)
-        key = sha1(hex(s)[2:]).digest()[:16]
-        msg = random.choice(open('/usr/share/dict/words').readlines()).strip()
+        key = sha1('%02x' % s).digest()[:16]
         iv, msg = aes_encrypt(key, msg)
         iv, msg = (yield iv, msg)
         while True:
@@ -193,7 +193,7 @@ injection attack; it's going to come up again.
         p, g, A = (yield)
         b, B = make_keys(p, g)
         s = pow(A, b, p)
-        key = sha1(hex(s)[2:]).digest()[:16]
+        key = sha1('%02x' % s).digest()[:16]
         iv, msg = (yield B)
         while True:
             msg = aes_decrypt(key, iv, msg)
@@ -203,9 +203,10 @@ injection attack; it's going to come up again.
 
 
     #prime the pump
-    a, b = alice(), bob()
+    msg = random.choice(open('/usr/share/dict/words').readlines()).strip()
+    a, b = alice(p, g, msg), bob()
     a_b, _ = a.next(), b.next()
-    #exchange key material and have a few rounds of conversation
+    #exchange key material and bounce msg
     for i in xrange(2):
         print '\tA->B:', a_b
         b_a = b.send(a_b)
@@ -218,8 +219,8 @@ injection attack; it's going to come up again.
         p, g, A = (yield)
         B = (yield p, g, p)
         a_b = (yield p)
-        s = pow(p, g, p) #always 0
-        key = sha1(hex(s)[2:]).digest()[:16]
+        s = 0
+        key = sha1('%02x' % s).digest()[:16]
         while True:
             print 'Mallory: A->B:', aes_decrypt(key, *a_b)
             b_a = (yield a_b)
@@ -231,9 +232,10 @@ injection attack; it's going to come up again.
     print
 
     #prime the pump
-    a, m, b = alice(), mallory(), bob()
+    msg = random.choice(open('/usr/share/dict/words').readlines()).strip()
+    a, m, b = alice(p, g, msg), mallory(), bob()
     a_m, _, _ = a.next(), m.next(), b.next()
-    #exchange key material and have a few rounds of conversation
+    #exchange key material and bounce msg
     for i in xrange(2):
         print '\tA->M:', a_m
         m_b = m.send(a_m)
@@ -266,17 +268,21 @@ Do the MITM attack again, but play with "g". What happens with:
 
 Write attacks for each.
 """
-    p, g = 37, 5
-
-    def alice():
+    p, g = nist_p, nist_g
+    #p, g = 37, 5
+    def alice(p, g, msg):
         ack = (yield p, g)
         if ack != 'ACK':
             raise Exception("Bad key agreement")
         a, A = make_keys(p, g)
         B = (yield A)
         s = pow(B, a, p)
-        key = sha1(hex(s)[2:]).digest()[:16]
-        msg = random.choice(open('/usr/share/dict/words').readlines()).strip()
+        print 'a params:', B, a, p, g, s
+        print
+        print 'a s:', p - B
+        print s == p-1
+        print
+        key = sha1('%02x' % s).digest()[:16]
         iv, msg = aes_encrypt(key, msg)
         iv, msg = (yield iv, msg)
         while True:
@@ -291,7 +297,13 @@ Write attacks for each.
         A = (yield 'ACK')
         b, B = make_keys(p, g)
         s = pow(A, b, p)
-        key = sha1(hex(s)[2:]).digest()[:16]
+        print 'b params:', A, b, p, g, s
+        print
+        print 'b s:', p - A
+        print s == p-1
+        print
+
+        key = sha1('%02x' % s).digest()[:16]
         iv, msg = (yield B)
         while True:
             msg = aes_decrypt(key, iv, msg)
@@ -301,9 +313,11 @@ Write attacks for each.
 
 
     #prime the pump
-    a, b = alice(), bob()
+    msg = random.choice(open('/usr/share/dict/words').readlines()).strip()
+    print "No attack, msg: %s" % msg
+    a, b = alice(p, g, msg), bob()
     a_b, _ = a.next(), b.next()
-    #exchange key material and have a few rounds of conversation
+    #exchange key material and bounce msg
     for i in xrange(3):
         print '\tA->B:', a_b
         b_a = b.send(a_b)
@@ -314,39 +328,53 @@ Write attacks for each.
 
     def mallory():
         p, g = (yield)
-        ack = (yield p, g) #mess with g
+        ack = (yield p, g)
         A = (yield ack)
         B = (yield A)
         a_b = (yield B)
-        #s = pow(p, g, p) #always 0
-        #key = sha1(hex(s)[2:]).digest()[:16]
+
+        if g == 1:
+            s = 1
+        elif g == p:
+            s = 0
+        elif g == p - 1:
+            if A % 2:
+                s = 1
+            else:
+                s = p - 1
+        print s
+        key = sha1('%02x' % s).digest()[:16]
+
         while True:
-            print 'Mallory: A->B:', a_b #aes_decrypt(key, *a_b)
+            print 'Mallory: A->B:', aes_decrypt(key, *a_b)
             b_a = (yield a_b)
 
-            print 'Mallory: B->A:', b_a #aes_decrypt(key, *b_a)
+            print 'Mallory: B->A:', aes_decrypt(key, *b_a)
             a_b = (yield b_a)
 
     print
     print
 
-    #prime the pump
-    a, m, b = alice(), mallory(), bob()
-    a_m, _, _ = a.next(), m.next(), b.next()
-    #exchange key material and have a few rounds of conversation
-    for i in xrange(3):
-        print '\tA->M:', a_m
-        m_b = m.send(a_m)
+    for g, comment in [(1, 'g = 1'), (p, 'g = p'), (p-1, 'g = p - 1')]:
+        msg = random.choice(open('/usr/share/dict/words').readlines()).strip()
+        print 'Attack with msg: %s, %s: %s' % (msg, comment, g)
+        #prime the pump
+        a, m, b = alice(p, g, msg), mallory(), bob()
+        a_m, _, _ = a.next(), m.next(), b.next()
+        #exchange key material and bounce msg
+        for i in xrange(3):
+            print '\tA->M:', a_m
+            m_b = m.send(a_m)
 
-        print '\tM->B:', m_b
-        b_m = b.send(m_b)
+            print '\tM->B:', m_b
+            b_m = b.send(m_b)
 
-        print '\tB->M:', b_m
-        m_a = m.send(b_m)
+            print '\tB->M:', b_m
+            m_a = m.send(b_m)
 
-        print '\tM->A:', m_a
-        a_m = a.send(m_a)
-
+            print '\tM->A:', m_a
+            a_m = a.send(m_a)
+        print
 
 
 
