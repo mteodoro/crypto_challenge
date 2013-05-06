@@ -92,9 +92,8 @@ fffffffffffff""".strip().split()), 16)
     print 's1 == s2:', s1 == s2
     print
 
-    s1key, s1mac = grouper(32, sha256(hex(s1)[2:]).hexdigest())
-    print 'key:', s1key, 'mac:', s1mac
-
+    s1key, s1mac = grouper(16, sha256(hex(s1)[2:]).digest())
+    print 'key:', s1key.encode('hex'), 'mac:', s1mac.encode('hex')
 
 
 def cc34():
