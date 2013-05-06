@@ -16,6 +16,11 @@ def grouper(n, iterable, fillvalue=None):
     return (''.join(group) for group in groups)
 
 
+def make_keys(p, g):
+    x = random.randint(0, sys.maxint) % p
+    return x, pow(g, x, p) #(g**x) % p
+
+
 def cc33():
     """33. Implement Diffie-Hellman
 
@@ -63,10 +68,6 @@ math, don't freak out), because you'll blow out your bignum library
 raising "a" to the 1024-bit-numberth power. You can find modexp
 routines on Rosetta Code for most languages.
 """
-    def make_keys(p, g):
-        x = random.randint(0, sys.maxint) % p
-        return x, pow(g, x, p) #(g**x) % p
-
     #p, g = 37, 5
     p = int(''.join("""
 ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024
@@ -136,40 +137,90 @@ this attack work; you could just generate Ma, MA, Mb, and MB as valid
 DH parameters to do a generic MITM attack. But do the parameter
 injection attack; it's going to come up again.
 """
-def alice():
-    print (yield 'A->B            Send "p", "g", "A"')
-    print (yield 'A->B            Send AES-CBC(SHA1(s)[0:16], iv=random(16), msg) + iv')
-    #print (yield)
-    i = 0
-    while True:
-        try:
-            print 'alice:', i
-            i = yield i
-        except GeneratorExit:
-            break
-
-def bob():
-    print (yield)
-    print (yield 'B->A            Send "B"')
-    i = yield "B->A            Send AES-CBC(SHA1(s)[0:16], iv=random(16), A's msg) + iv"
-    while True:
-        try:
-            print 'bob:', i
-            i = yield i + 1
-        except GeneratorExit:
-            break
+    p = int(''.join("""
+ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024
+e088a67cc74020bbea63b139b22514a08798e3404ddef9519b3cd
+3a431b302b0a6df25f14374fe1356d6d51c245e485b576625e7ec
+6f44c42e9a637ed6b0bff5cb6f406b7edee386bfb5a899fa5ae9f
+24117c4b1fe649286651ece45b3dc2007cb8a163bf0598da48361
+c55d39a69163fa8fd24cf5f83655d23dca3ad961c62f356208552
+bb9ed529077096966d670c354e4abc9804f1746c08ca237327fff
+fffffffffffff""".strip().split()), 16)
+    g = 2
+    #TODO lose this
+    p, g = 37, 5
+    print 'p:', p
+    print 'g:', g
+    print
 
 
-a = alice()
-msg = a.next()
-b = bob()
-b.next()
+    def alice():
+        a, A = make_keys(p, g)
+        B = (yield p, g, A)
+        s = pow(B, a, p)
+        #make message, encrypt, send iv+data
+        iv, msg = 'a_iv', ''
+        while True:
+            iv, msg = (yield iv, msg + 'A')
 
-for i in xrange(10):
-    print 'MALLORY    a->b', msg
-    msg = b.send(msg)
-    print 'MALLORY    b->a', msg
-    msg = a.send(msg)
+
+    def bob():
+        p, g, A = (yield)
+        b, B = make_keys(g, p)
+        s = pow(A, b, p)
+        iv, msg = (yield B)
+        while True:
+            iv, msg = (yield iv, msg + 'B')
+
+
+    #prime the pump
+    a = alice()
+    msg = a.next()
+    b = bob()
+    b.next()
+    for i in xrange(10):
+        print 'a:', msg
+        msg = b.send(msg)
+
+        print 'b:', msg
+        msg = a.send(msg)
+
+
+    return
+    def alice():
+        print (yield 'A->B            Send "p", "g", "A"')
+        print (yield 'A->B            Send AES-CBC(SHA1(s)[0:16], iv=random(16), msg) + iv')
+        #print (yield)
+        i = 0
+        while True:
+            try:
+                print 'alice:', i
+                i = yield i
+            except GeneratorExit:
+                break
+
+    def bob():
+        print (yield)
+        print (yield 'B->A            Send "B"')
+        i = yield "B->A            Send AES-CBC(SHA1(s)[0:16], iv=random(16), A's msg) + iv"
+        while True:
+            try:
+                print 'bob:', i
+                i = yield i + 1
+            except GeneratorExit:
+                break
+
+
+    a = alice()
+    msg = a.next()
+    b = bob()
+    b.next()
+
+    for i in xrange(10):
+        print 'MALLORY    a->b', msg
+        msg = b.send(msg)
+        print 'MALLORY    b->a', msg
+        msg = a.send(msg)
 
 
 def cc35():
