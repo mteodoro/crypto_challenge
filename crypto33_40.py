@@ -173,13 +173,15 @@ fffffffffffff""".strip().split()), 16)
     def encrypt(key, data):
         iv = random_key(16)
         data = AES.new(key, IV=iv, mode=AES.MODE_CBC).encrypt(pkcs7_pad(16, data))
-        return iv.encode('hex'), data.encode('hex')
+        iv, data = iv.encode('hex'), data.encode('hex')
+        return iv, data
 
     def decrypt(key, iv, data):
         iv, data = iv.decode('hex'), data.decode('hex')
         return pkcs7_strip(AES.new(key, IV=iv, mode=AES.MODE_CBC).decrypt(data))
 
     def alice():
+        #p, g = 37, 5
         a, A = make_keys(p, g)
         B = (yield p, g, A)
         s = pow(B, a, p)
@@ -197,7 +199,7 @@ fffffffffffff""".strip().split()), 16)
 
     def bob():
         p, g, A = (yield)
-        b, B = make_keys(g, p)
+        b, B = make_keys(p, g)
         s = pow(A, b, p)
         key = sha1(hex(s)[2:]).digest()[:16]
         iv, msg = (yield B)
@@ -211,14 +213,49 @@ fffffffffffff""".strip().split()), 16)
 
     #prime the pump
     a, b = alice(), bob()
-    msg, _ = a.next(), b.next()
+    a_b, _ = a.next(), b.next()
     #exchange key material and have a few rounds of conversation
     for i in xrange(3):
-        print 'A->B:', msg
-        msg = b.send(msg)
+        print '\tA->B:', a_b
+        b_a = b.send(a_b)
 
-        print 'B->A:', msg
-        msg = a.send(msg)
+        print '\tB->A:', b_a
+        a_b = a.send(b_a)
+
+
+    def mallory():
+        p, g, A = (yield)
+        B = (yield p, g, p)
+        a_b = (yield p)
+        s = pow(p, g, p) #always 0
+        key = sha1(hex(s)[2:]).digest()[:16]
+        while True:
+            print 'Mallory: A->B:', decrypt(key, *a_b)
+            b_a = (yield a_b)
+
+            print 'Mallory: B->A:', decrypt(key, *b_a)
+            a_b = (yield b_a)
+
+    print
+    print
+
+    #prime the pump
+    a, m, b = alice(), mallory(), bob()
+    a_m, _, _ = a.next(), m.next(), b.next()
+    #exchange key material and have a few rounds of conversation
+    for i in xrange(3):
+        print '\tA->M:', a_m
+        m_b = m.send(a_m)
+
+        print '\tM->B:', m_b
+        b_m = b.send(m_b)
+
+        print '\tB->M:', b_m
+        m_a = m.send(b_m)
+
+        print '\tM->A:', m_a
+        a_m = a.send(m_a)
+
 
 
 def cc35():
