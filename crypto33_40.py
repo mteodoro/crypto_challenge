@@ -159,6 +159,7 @@ this attack work; you could just generate Ma, MA, Mb, and MB as valid
 DH parameters to do a generic MITM attack. But do the parameter
 injection attack; it's going to come up again.
 """
+    #p, g = 37, 5
     p = int(''.join("""
 ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024
 e088a67cc74020bbea63b139b22514a08798e3404ddef9519b3cd
@@ -181,18 +182,16 @@ fffffffffffff""".strip().split()), 16)
         return pkcs7_strip(AES.new(key, IV=iv, mode=AES.MODE_CBC).decrypt(data))
 
     def alice():
-        #p, g = 37, 5
         a, A = make_keys(p, g)
         B = (yield p, g, A)
         s = pow(B, a, p)
         key = sha1(hex(s)[2:]).digest()[:16]
-        msg = 'A'
+        msg = random.choice(open('/usr/share/dict/words').readlines()).strip()
         iv, msg = encrypt(key, msg)
         iv, msg = (yield iv, msg)
         while True:
             msg = decrypt(key, iv, msg)
             print 'Alice: Bob sent:', msg
-            msg += 'A'
             iv, msg = encrypt(key, msg)
             iv, msg = (yield iv, msg)
 
@@ -206,7 +205,6 @@ fffffffffffff""".strip().split()), 16)
         while True:
             msg = decrypt(key, iv, msg)
             print 'Bob: Alice sent:', msg
-            msg += 'B'
             iv, msg = encrypt(key, msg)
             iv, msg = (yield iv, msg)
 
@@ -215,7 +213,7 @@ fffffffffffff""".strip().split()), 16)
     a, b = alice(), bob()
     a_b, _ = a.next(), b.next()
     #exchange key material and have a few rounds of conversation
-    for i in xrange(3):
+    for i in xrange(2):
         print '\tA->B:', a_b
         b_a = b.send(a_b)
 
@@ -243,7 +241,7 @@ fffffffffffff""".strip().split()), 16)
     a, m, b = alice(), mallory(), bob()
     a_m, _, _ = a.next(), m.next(), b.next()
     #exchange key material and have a few rounds of conversation
-    for i in xrange(3):
+    for i in xrange(2):
         print '\tA->M:', a_m
         m_b = m.send(a_m)
 
