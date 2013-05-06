@@ -136,6 +136,40 @@ this attack work; you could just generate Ma, MA, Mb, and MB as valid
 DH parameters to do a generic MITM attack. But do the parameter
 injection attack; it's going to come up again.
 """
+def alice():
+    print (yield 'A->B            Send "p", "g", "A"')
+    print (yield 'A->B            Send AES-CBC(SHA1(s)[0:16], iv=random(16), msg) + iv')
+    #print (yield)
+    i = 0
+    while True:
+        try:
+            print 'alice:', i
+            i = yield i
+        except GeneratorExit:
+            break
+
+def bob():
+    print (yield)
+    print (yield 'B->A            Send "B"')
+    i = yield "B->A            Send AES-CBC(SHA1(s)[0:16], iv=random(16), A's msg) + iv"
+    while True:
+        try:
+            print 'bob:', i
+            i = yield i + 1
+        except GeneratorExit:
+            break
+
+
+a = alice()
+msg = a.next()
+b = bob()
+b.next()
+
+for i in xrange(10):
+    print 'MALLORY    a->b', msg
+    msg = b.send(msg)
+    print 'MALLORY    b->a', msg
+    msg = a.send(msg)
 
 
 def cc35():
