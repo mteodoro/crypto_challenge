@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 import sys
-from hashlib import sha256
+from hashlib import sha1, sha256
 import random
 import itertools
+
+from Crypto.Cipher import AES
 
 random.seed('matasano') #for reproducibility - will work with any seed
 
@@ -19,6 +21,26 @@ def grouper(n, iterable, fillvalue=None):
 def make_keys(p, g):
     x = random.randint(0, sys.maxint) % p
     return x, pow(g, x, p) #(g**x) % p
+
+
+def random_key(keylen):
+    return ''.join(chr(random.randint(0,255)) for _ in xrange(keylen))
+
+
+def pkcs7_pad(blocklen, data):
+    padlen = blocklen - len(data) % blocklen
+    return data + chr(padlen) * padlen
+
+
+class PadException(Exception):
+        pass
+
+def pkcs7_strip(data):
+    padchar = data[-1]
+    padlen = ord(padchar)
+    if padlen == 0 or not data.endswith(padchar * padlen):
+        raise PadException
+    return data[:-padlen]
 
 
 def cc33():
@@ -147,79 +169,55 @@ c55d39a69163fa8fd24cf5f83655d23dca3ad961c62f356208552
 bb9ed529077096966d670c354e4abc9804f1746c08ca237327fff
 fffffffffffff""".strip().split()), 16)
     g = 2
-    #TODO lose this
-    p, g = 37, 5
-    print 'p:', p
-    print 'g:', g
-    print
 
+    def encrypt(key, data):
+        iv = random_key(16)
+        data = AES.new(key, IV=iv, mode=AES.MODE_CBC).encrypt(pkcs7_pad(16, data))
+        return iv.encode('hex'), data.encode('hex')
+
+    def decrypt(key, iv, data):
+        iv, data = iv.decode('hex'), data.decode('hex')
+        return pkcs7_strip(AES.new(key, IV=iv, mode=AES.MODE_CBC).decrypt(data))
 
     def alice():
         a, A = make_keys(p, g)
         B = (yield p, g, A)
         s = pow(B, a, p)
-        #make message, encrypt, send iv+data
-        iv, msg = 'a_iv', ''
+        key = sha1(hex(s)[2:]).digest()[:16]
+        msg = 'A'
+        iv, msg = encrypt(key, msg)
+        iv, msg = (yield iv, msg)
         while True:
-            iv, msg = (yield iv, msg + 'A')
+            msg = decrypt(key, iv, msg)
+            print 'Alice: Bob sent:', msg
+            msg += 'A'
+            iv, msg = encrypt(key, msg)
+            iv, msg = (yield iv, msg)
 
 
     def bob():
         p, g, A = (yield)
         b, B = make_keys(g, p)
         s = pow(A, b, p)
+        key = sha1(hex(s)[2:]).digest()[:16]
         iv, msg = (yield B)
         while True:
-            iv, msg = (yield iv, msg + 'B')
+            msg = decrypt(key, iv, msg)
+            print 'Bob: Alice sent:', msg
+            msg += 'B'
+            iv, msg = encrypt(key, msg)
+            iv, msg = (yield iv, msg)
 
 
     #prime the pump
-    a = alice()
-    msg = a.next()
-    b = bob()
-    b.next()
-    for i in xrange(10):
-        print 'a:', msg
+    a, b = alice(), bob()
+    msg, _ = a.next(), b.next()
+    #exchange key material and have a few rounds of conversation
+    for i in xrange(3):
+        print 'A->B:', msg
         msg = b.send(msg)
 
-        print 'b:', msg
-        msg = a.send(msg)
-
-
-    return
-    def alice():
-        print (yield 'A->B            Send "p", "g", "A"')
-        print (yield 'A->B            Send AES-CBC(SHA1(s)[0:16], iv=random(16), msg) + iv')
-        #print (yield)
-        i = 0
-        while True:
-            try:
-                print 'alice:', i
-                i = yield i
-            except GeneratorExit:
-                break
-
-    def bob():
-        print (yield)
-        print (yield 'B->A            Send "B"')
-        i = yield "B->A            Send AES-CBC(SHA1(s)[0:16], iv=random(16), A's msg) + iv"
-        while True:
-            try:
-                print 'bob:', i
-                i = yield i + 1
-            except GeneratorExit:
-                break
-
-
-    a = alice()
-    msg = a.next()
-    b = bob()
-    b.next()
-
-    for i in xrange(10):
-        print 'MALLORY    a->b', msg
-        msg = b.send(msg)
-        print 'MALLORY    b->a', msg
+        print 'B->A:', msg
         msg = a.send(msg)
 
 
