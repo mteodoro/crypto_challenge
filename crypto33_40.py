@@ -277,11 +277,7 @@ Write attacks for each.
         a, A = make_keys(p, g)
         B = (yield A)
         s = pow(B, a, p)
-        print 'a params:', B, a, p, g, s
-        print
-        print 'a s:', p - B
-        print s == p-1
-        print
+        #print 'a params:', B, a, p, g, s
         key = sha1('%02x' % s).digest()[:16]
         iv, msg = aes_encrypt(key, msg)
         iv, msg = (yield iv, msg)
@@ -297,12 +293,7 @@ Write attacks for each.
         A = (yield 'ACK')
         b, B = make_keys(p, g)
         s = pow(A, b, p)
-        print 'b params:', A, b, p, g, s
-        print
-        print 'b s:', p - A
-        print s == p-1
-        print
-
+        #print 'b params:', A, b, p, g, s
         key = sha1('%02x' % s).digest()[:16]
         iv, msg = (yield B)
         while True:
@@ -338,13 +329,15 @@ Write attacks for each.
         elif g == p:
             s = 0
         elif g == p - 1:
-            if A % 2:
-                s = 1
-            else:
+            #TODO can we tell if s is 1 or p-1 without trying it?
+            s = 1
+            key = sha1('%02x' % s).digest()[:16]
+            try:
+                aes_decrypt(key, *a_b)
+            except PadException:
                 s = p - 1
-        print s
-        key = sha1('%02x' % s).digest()[:16]
 
+        key = sha1('%02x' % s).digest()[:16]
         while True:
             print 'Mallory: A->B:', aes_decrypt(key, *a_b)
             b_a = (yield a_b)
@@ -357,7 +350,7 @@ Write attacks for each.
 
     for g, comment in [(1, 'g = 1'), (p, 'g = p'), (p-1, 'g = p - 1')]:
         msg = random.choice(open('/usr/share/dict/words').readlines()).strip()
-        print 'Attack with msg: %s, %s: %s' % (msg, comment, g)
+        print 'Attack with msg: %s, %s:' % (msg, comment)
         #prime the pump
         a, m, b = alice(p, g, msg), mallory(), bob()
         a_m, _, _ = a.next(), m.next(), b.next()
