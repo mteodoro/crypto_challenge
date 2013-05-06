@@ -248,7 +248,6 @@ injection attack; it's going to come up again.
         a_m = a.send(m_a)
 
 
-
 def cc35():
     """35. Implement DH with negotiated groups, and break with malicious "g" parameters
 
@@ -267,6 +266,88 @@ Do the MITM attack again, but play with "g". What happens with:
 
 Write attacks for each.
 """
+    p, g = 37, 5
+
+    def alice():
+        ack = (yield p, g)
+        if ack != 'ACK':
+            raise Exception("Bad key agreement")
+        a, A = make_keys(p, g)
+        B = (yield A)
+        s = pow(B, a, p)
+        key = sha1(hex(s)[2:]).digest()[:16]
+        msg = random.choice(open('/usr/share/dict/words').readlines()).strip()
+        iv, msg = aes_encrypt(key, msg)
+        iv, msg = (yield iv, msg)
+        while True:
+            msg = aes_decrypt(key, iv, msg)
+            print 'Alice: Bob sent:', msg
+            iv, msg = aes_encrypt(key, msg)
+            iv, msg = (yield iv, msg)
+
+
+    def bob():
+        p, g = (yield)
+        A = (yield 'ACK')
+        b, B = make_keys(p, g)
+        s = pow(A, b, p)
+        key = sha1(hex(s)[2:]).digest()[:16]
+        iv, msg = (yield B)
+        while True:
+            msg = aes_decrypt(key, iv, msg)
+            print 'Bob: Alice sent:', msg
+            iv, msg = aes_encrypt(key, msg)
+            iv, msg = (yield iv, msg)
+
+
+    #prime the pump
+    a, b = alice(), bob()
+    a_b, _ = a.next(), b.next()
+    #exchange key material and have a few rounds of conversation
+    for i in xrange(3):
+        print '\tA->B:', a_b
+        b_a = b.send(a_b)
+
+        print '\tB->A:', b_a
+        a_b = a.send(b_a)
+
+
+    def mallory():
+        p, g = (yield)
+        ack = (yield p, g) #mess with g
+        A = (yield ack)
+        B = (yield A)
+        a_b = (yield B)
+        #s = pow(p, g, p) #always 0
+        #key = sha1(hex(s)[2:]).digest()[:16]
+        while True:
+            print 'Mallory: A->B:', a_b #aes_decrypt(key, *a_b)
+            b_a = (yield a_b)
+
+            print 'Mallory: B->A:', b_a #aes_decrypt(key, *b_a)
+            a_b = (yield b_a)
+
+    print
+    print
+
+    #prime the pump
+    a, m, b = alice(), mallory(), bob()
+    a_m, _, _ = a.next(), m.next(), b.next()
+    #exchange key material and have a few rounds of conversation
+    for i in xrange(3):
+        print '\tA->M:', a_m
+        m_b = m.send(a_m)
+
+        print '\tM->B:', m_b
+        b_m = b.send(m_b)
+
+        print '\tB->M:', b_m
+        m_a = m.send(b_m)
+
+        print '\tM->A:', m_a
+        a_m = a.send(m_a)
+
+
 
 
 def cc36():
