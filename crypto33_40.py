@@ -54,6 +54,18 @@ def pkcs7_strip(data):
     return data[:-padlen]
 
 
+def aes_encrypt(key, data, mode=AES.MODE_CBC):
+    iv = random_key(16)
+    data = AES.new(key, IV=iv, mode=mode).encrypt(pkcs7_pad(16, data))
+    iv, data = iv.encode('hex'), data.encode('hex')
+    return iv, data
+
+
+def aes_decrypt(key, iv, data, mode=AES.MODE_CBC):
+    iv, data = iv.decode('hex'), data.decode('hex')
+    return pkcs7_strip(AES.new(key, IV=iv, mode=mode).decrypt(data))
+
+
 def cc33():
     """33. Implement Diffie-Hellman
 
@@ -162,28 +174,18 @@ injection attack; it's going to come up again.
 """
     #p, g = 37, 5
 
-    def encrypt(key, data):
-        iv = random_key(16)
-        data = AES.new(key, IV=iv, mode=AES.MODE_CBC).encrypt(pkcs7_pad(16, data))
-        iv, data = iv.encode('hex'), data.encode('hex')
-        return iv, data
-
-    def decrypt(key, iv, data):
-        iv, data = iv.decode('hex'), data.decode('hex')
-        return pkcs7_strip(AES.new(key, IV=iv, mode=AES.MODE_CBC).decrypt(data))
-
     def alice():
         a, A = make_keys(p, g)
         B = (yield p, g, A)
         s = pow(B, a, p)
         key = sha1(hex(s)[2:]).digest()[:16]
         msg = random.choice(open('/usr/share/dict/words').readlines()).strip()
-        iv, msg = encrypt(key, msg)
+        iv, msg = aes_encrypt(key, msg)
         iv, msg = (yield iv, msg)
         while True:
-            msg = decrypt(key, iv, msg)
+            msg = aes_decrypt(key, iv, msg)
             print 'Alice: Bob sent:', msg
-            iv, msg = encrypt(key, msg)
+            iv, msg = aes_encrypt(key, msg)
             iv, msg = (yield iv, msg)
 
 
@@ -194,9 +196,9 @@ injection attack; it's going to come up again.
         key = sha1(hex(s)[2:]).digest()[:16]
         iv, msg = (yield B)
         while True:
-            msg = decrypt(key, iv, msg)
+            msg = aes_decrypt(key, iv, msg)
             print 'Bob: Alice sent:', msg
-            iv, msg = encrypt(key, msg)
+            iv, msg = aes_encrypt(key, msg)
             iv, msg = (yield iv, msg)
 
 
@@ -219,10 +221,10 @@ injection attack; it's going to come up again.
         s = pow(p, g, p) #always 0
         key = sha1(hex(s)[2:]).digest()[:16]
         while True:
-            print 'Mallory: A->B:', decrypt(key, *a_b)
+            print 'Mallory: A->B:', aes_decrypt(key, *a_b)
             b_a = (yield a_b)
 
-            print 'Mallory: B->A:', decrypt(key, *b_a)
+            print 'Mallory: B->A:', aes_decrypt(key, *b_a)
             a_b = (yield b_a)
 
     print
