@@ -181,12 +181,11 @@ injection attack; it's going to come up again.
         s = pow(B, a, p)
         key = sha1('%02x' % s).digest()[:16]
         iv, msg = aes_encrypt(key, msg)
+        #send message to bob and get his back
         iv, msg = (yield iv, msg)
-        while True:
-            msg = aes_decrypt(key, iv, msg)
-            print 'Alice: Bob sent:', msg
-            iv, msg = aes_encrypt(key, msg)
-            iv, msg = (yield iv, msg)
+        msg = aes_decrypt(key, iv, msg)
+        print 'Alice: Bob sent:', msg
+        yield None
 
 
     def bob():
@@ -195,19 +194,19 @@ injection attack; it's going to come up again.
         s = pow(A, b, p)
         key = sha1('%02x' % s).digest()[:16]
         iv, msg = (yield B)
-        while True:
-            msg = aes_decrypt(key, iv, msg)
-            print 'Bob: Alice sent:', msg
-            iv, msg = aes_encrypt(key, msg)
-            iv, msg = (yield iv, msg)
+        msg = aes_decrypt(key, iv, msg)
+        print 'Bob: Alice sent:', msg
+        #repeat what alice sent back to her
+        iv, msg = aes_encrypt(key, msg)
+        iv, msg = (yield iv, msg)
 
 
-    #prime the pump
     msg = random.choice(open('/usr/share/dict/words').readlines()).strip()
+    #prime the pump
     a, b = alice(p, g, msg), bob()
     a_b, _ = a.next(), b.next()
     #exchange key material and bounce msg
-    for i in xrange(2):
+    while a_b:
         print '\tA->B:', a_b
         b_a = b.send(a_b)
 
@@ -231,12 +230,12 @@ injection attack; it's going to come up again.
     print
     print
 
-    #prime the pump
     msg = random.choice(open('/usr/share/dict/words').readlines()).strip()
+    #prime the pump
     a, m, b = alice(p, g, msg), mallory(), bob()
     a_m, _, _ = a.next(), m.next(), b.next()
     #exchange key material and bounce msg
-    for i in xrange(2):
+    while a_m:
         print '\tA->M:', a_m
         m_b = m.send(a_m)
 
@@ -280,12 +279,11 @@ Write attacks for each.
         #print 'a params:', B, a, p, g, s
         key = sha1('%02x' % s).digest()[:16]
         iv, msg = aes_encrypt(key, msg)
+        #send message to bob and get his back
         iv, msg = (yield iv, msg)
-        while True:
-            msg = aes_decrypt(key, iv, msg)
-            print 'Alice: Bob sent:', msg
-            iv, msg = aes_encrypt(key, msg)
-            iv, msg = (yield iv, msg)
+        msg = aes_decrypt(key, iv, msg)
+        print 'Alice: Bob sent:', msg
+        yield None
 
 
     def bob():
@@ -296,20 +294,20 @@ Write attacks for each.
         #print 'b params:', A, b, p, g, s
         key = sha1('%02x' % s).digest()[:16]
         iv, msg = (yield B)
-        while True:
-            msg = aes_decrypt(key, iv, msg)
-            print 'Bob: Alice sent:', msg
-            iv, msg = aes_encrypt(key, msg)
-            iv, msg = (yield iv, msg)
+        msg = aes_decrypt(key, iv, msg)
+        print 'Bob: Alice sent:', msg
+        #repeat what alice sent back to her
+        iv, msg = aes_encrypt(key, msg)
+        iv, msg = (yield iv, msg)
 
 
-    #prime the pump
     msg = random.choice(open('/usr/share/dict/words').readlines()).strip()
     print "No attack, msg: %s" % msg
+    #prime the pump
     a, b = alice(p, g, msg), bob()
     a_b, _ = a.next(), b.next()
     #exchange key material and bounce msg
-    for i in xrange(3):
+    while a_b:
         print '\tA->B:', a_b
         b_a = b.send(a_b)
 
@@ -355,7 +353,7 @@ Write attacks for each.
         a, m, b = alice(p, g, msg), mallory(), bob()
         a_m, _, _ = a.next(), m.next(), b.next()
         #exchange key material and bounce msg
-        for i in xrange(3):
+        while a_m:
             print '\tA->M:', a_m
             m_b = m.send(a_m)
 
@@ -368,7 +366,6 @@ Write attacks for each.
             print '\tM->A:', m_a
             a_m = a.send(m_a)
         print
-
 
 
 def cc36():
