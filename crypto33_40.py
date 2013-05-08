@@ -524,8 +524,7 @@ Now log in without your password by having the client send N, N*2, &c.
             c_s = c.send(s_c)
         print
 
-    print """
-Sending A == 0 or an even multiple of N forces server's S to be 0 as well."""
+    print "Sending A == 0 or an even multiple of N forces server's S to be 0."
 
 
 def cc38():
@@ -553,6 +552,53 @@ arbitrary values for b, B, u, and salt.
 
 Crack the password from A's HMAC-SHA256(K, salt).
 """
+    p, g = nist_p, nist_g
+    #p, g = 37, 5
+    def client(N, g, k, I, P):
+        a, A = make_keys(N, g)
+        salt, B, u = (yield I, A)
+
+        xH = sha256(salt + P).hexdigest()
+        x = int(xH, 16)
+        S = pow(B, a + u * x, N)
+        K = sha256(str(S)).hexdigest()
+        h = hmac.new(K, salt, sha256).hexdigest()
+        ok = (yield h)
+        print 'Login OK' if ok == 'OK' else 'Login Failed'
+        yield None
+
+
+    def make_credential(N, g, P):
+        salt = random_key(16)
+        xH = sha256(salt + P).hexdigest()
+        x = int(xH, 16)
+        v = pow(g, x, N)
+        return salt, v
+
+
+    def server(N, g, k, credentials):
+        I, A = (yield)
+        salt, v = credentials[I]
+        b, B = make_keys(N, g)
+        u = random.randint(0, 2**128 - 1)
+        h = (yield salt, B, u)
+        S = pow(A * pow(v, u, N), b, N)
+        K = sha256(str(S)).hexdigest()
+        yield 'OK' if h == hmac.new(K, salt, sha256).hexdigest() else 'FAIL'
+
+
+    email, password = 'mc@hammer.com', '2legit2quit'
+    credentials = {email: make_credential(p, g, password)}
+    #prime the pump
+    c, s = client(p, g, 3, email, password), server(p, g, 3, credentials)
+    c_s, _ = c.next(), s.next()
+    while c_s:
+        print '\tC->S:', c_s
+        s_c = s.send(c_s)
+
+        print '\tS->C:', s_c
+        c_s = c.send(s_c)
+
 
 
 def cc39():
