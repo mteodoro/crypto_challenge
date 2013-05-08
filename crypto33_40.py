@@ -39,6 +39,10 @@ def random_key(keylen):
     return ''.join(chr(random.randint(0,255)) for _ in xrange(keylen))
 
 
+def random_word():
+    return random.choice(open('/usr/share/dict/words').readlines()).strip()
+
+
 def pkcs7_pad(blocklen, data):
     padlen = blocklen - len(data) % blocklen
     return data + chr(padlen) * padlen
@@ -202,7 +206,7 @@ injection attack; it's going to come up again.
         iv, msg = (yield iv, msg)
 
 
-    msg = random.choice(open('/usr/share/dict/words').readlines()).strip()
+    msg = random_word()
     #prime the pump
     a, b = alice(p, g, msg), bob()
     a_b, _ = a.next(), b.next()
@@ -231,7 +235,7 @@ injection attack; it's going to come up again.
     print
     print
 
-    msg = random.choice(open('/usr/share/dict/words').readlines()).strip()
+    msg = random_word()
     #prime the pump
     a, m, b = alice(p, g, msg), mallory(), bob()
     a_m, _, _ = a.next(), m.next(), b.next()
@@ -302,7 +306,7 @@ Write attacks for each.
         iv, msg = (yield iv, msg)
 
 
-    msg = random.choice(open('/usr/share/dict/words').readlines()).strip()
+    msg = random_word()
     print "No attack, msg: %s" % msg
     #prime the pump
     a, b = alice(p, g, msg), bob()
@@ -348,7 +352,7 @@ Write attacks for each.
     print
 
     for g, comment in [(1, 'g = 1'), (p, 'g = p'), (p-1, 'g = p - 1')]:
-        msg = random.choice(open('/usr/share/dict/words').readlines()).strip()
+        msg = random_word()
         print 'Attack with msg: %s, %s:' % (msg, comment)
         #prime the pump
         a, m, b = alice(p, g, msg), mallory(), bob()
@@ -450,8 +454,7 @@ an easily crackable password-equivalent.
         yield 'OK' if h == hmac.new(K, salt, sha256).hexdigest() else 'FAIL'
 
 
-    email = 'vanilla@ice.com'
-    password = random.choice(open('/usr/share/dict/words').readlines()).strip()
+    email, password = 'vanilla@ice.com', random_word()
     credentials = {email: make_credential(p, g, password)}
     #prime the pump
     c, s = client(p, g, 3, email, password), server(p, g, 3, credentials)
@@ -509,8 +512,7 @@ Now log in without your password by having the client send N, N*2, &c.
         yield 'OK' if h == hmac.new(K, salt, sha256).hexdigest() else 'FAIL'
 
 
-    email = 'vanilla@ice.com'
-    password = random.choice(open('/usr/share/dict/words').readlines()).strip()
+    email, password = 'vanilla@ice.com', random_word()
     credentials = {email: make_credential(p, g, password)}
 
     for A,comment in [(0, '0'), (p, 'N'), (p*2, 'N*2'), (p*3, 'N*42')]:
@@ -600,8 +602,7 @@ Crack the password from A's HMAC-SHA256(K, salt).
         yield 'OK' if h == hmac.new(K, salt, sha256).hexdigest() else 'FAIL'
 
 
-    email = 'vanilla@ice.com'
-    password = random.choice(open('/usr/share/dict/words').readlines()).strip()
+    email, password = 'vanilla@ice.com', random_word()
     credentials = {email: make_credential(p, g, password)}
     #prime the pump
     c, s = client(p, g, 3, email, password), server(p, g, 3, credentials)
