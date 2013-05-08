@@ -450,7 +450,8 @@ an easily crackable password-equivalent.
         yield 'OK' if h == hmac.new(K, salt, sha256).hexdigest() else 'FAIL'
 
 
-    email, password = 'mc@hammer.com', '2legit2quit'
+    email = 'vanilla@ice.com'
+    password = random.choice(open('/usr/share/dict/words').readlines()).strip()
     credentials = {email: make_credential(p, g, password)}
     #prime the pump
     c, s = client(p, g, 3, email, password), server(p, g, 3, credentials)
@@ -508,7 +509,8 @@ Now log in without your password by having the client send N, N*2, &c.
         yield 'OK' if h == hmac.new(K, salt, sha256).hexdigest() else 'FAIL'
 
 
-    email, password = 'mc@hammer.com', '2legit2quit'
+    email = 'vanilla@ice.com'
+    password = random.choice(open('/usr/share/dict/words').readlines()).strip()
     credentials = {email: make_credential(p, g, password)}
 
     for A,comment in [(0, '0'), (p, 'N'), (p*2, 'N*2'), (p*3, 'N*42')]:
@@ -598,7 +600,8 @@ Crack the password from A's HMAC-SHA256(K, salt).
         yield 'OK' if h == hmac.new(K, salt, sha256).hexdigest() else 'FAIL'
 
 
-    email, password = 'mc@hammer.com', '2legit2quit'
+    email = 'vanilla@ice.com'
+    password = random.choice(open('/usr/share/dict/words').readlines()).strip()
     credentials = {email: make_credential(p, g, password)}
     #prime the pump
     c, s = client(p, g, 3, email, password), server(p, g, 3, credentials)
