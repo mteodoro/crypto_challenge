@@ -474,6 +474,58 @@ Now log in without your password by having the client send 0 as its
 
 Now log in without your password by having the client send N, N*2, &c.
 """
+    p, g = nist_p, nist_g
+    #p, g = 37, 5
+    def client_A(N, g, k, I, A):
+        salt, B = (yield I, A)
+        K = sha256(str(0)).hexdigest()
+        h = hmac.new(K, salt, sha256).hexdigest()
+        ok = (yield h)
+        print 'Login OK' if ok == 'OK' else 'Login Failed'
+        yield None
+
+
+    def make_credential(N, g, P):
+        salt = random_key(16)
+        xH = sha256(salt + P).hexdigest()
+        x = int(xH, 16)
+        v = pow(g, x, N)
+        return salt, v
+
+
+    def server(N, g, k, credentials):
+        I, A = (yield)
+        salt, v = credentials[I]
+        b, B = make_keys(N, g)
+        B += k * v
+        h = (yield salt, B)
+
+        uH = sha256(str(A) + str(B)).hexdigest()
+        u = int(uH, 16)
+        S = pow(A * pow(v, u, N), b, N)
+        #print 'S s:', S
+        K = sha256(str(S)).hexdigest()
+        yield 'OK' if h == hmac.new(K, salt, sha256).hexdigest() else 'FAIL'
+
+
+    email, password = 'mc@hammer.com', '2legit2quit'
+    credentials = {email: make_credential(p, g, password)}
+
+    for A,comment in [(0, '0'), (p, 'N'), (p*2, 'N*2'), (p*3, 'N*42')]:
+        print 'Attack with A == %s:' % comment
+        #prime the pump
+        c, s = client_A(p, g, 3, email, A), server(p, g, 3, credentials)
+        c_s, _ = c.next(), s.next()
+        while c_s:
+            print '\tC->S:', c_s
+            s_c = s.send(c_s)
+
+            print '\tS->C:', s_c
+            c_s = c.send(s_c)
+        print
+
+    print """
+Sending A == 0 or an even multiple of N forces server's S to be 0 as well."""
 
 
 def cc38():
