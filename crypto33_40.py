@@ -552,8 +552,8 @@ arbitrary values for b, B, u, and salt.
 
 Crack the password from A's HMAC-SHA256(K, salt).
 """
-    p, g = nist_p, nist_g
-    #p, g = 37, 5
+    #p, g = nist_p, nist_g
+    p, g = 37, 5
     def client(N, g, k, I, P):
         a, A = make_keys(N, g)
         salt, B, u = (yield I, A)
@@ -566,6 +566,17 @@ Crack the password from A's HMAC-SHA256(K, salt).
         ok = (yield h)
         print 'Login OK' if ok == 'OK' else 'Login Failed'
         yield None
+
+
+    def mitm_server(N, g, k):
+        I, A = (yield)
+        #salt, v = credentials[I]
+        b, B = make_keys(N, g)
+        u = random.randint(0, 2**128 - 1)
+        h = (yield salt, B, u)
+        S = pow(A * pow(v, u, N), b, N)
+        K = sha256(str(S)).hexdigest()
+        yield 'OK' if h == hmac.new(K, salt, sha256).hexdigest() else 'FAIL'
 
 
     def make_credential(N, g, P):
