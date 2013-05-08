@@ -556,9 +556,9 @@ arbitrary values for b, B, u, and salt.
 
 Crack the password from A's HMAC-SHA256(K, salt).
 """
-    #p, g = nist_p, nist_g
-    p, g = 37, 5
-    def client(N, g, k, I, P):
+    p, g = nist_p, nist_g
+    #p, g = 37, 5
+    def client(N, g, I, P):
         a, A = make_keys(N, g)
         salt, B, u = (yield I, A)
 
@@ -572,17 +572,6 @@ Crack the password from A's HMAC-SHA256(K, salt).
         yield None
 
 
-    def mitm_server(N, g, k):
-        I, A = (yield)
-        #salt, v = credentials[I]
-        b, B = make_keys(N, g)
-        u = random.randint(0, 2**128 - 1)
-        h = (yield salt, B, u)
-        S = pow(A * pow(v, u, N), b, N)
-        K = sha256(str(S)).hexdigest()
-        yield 'OK' if h == hmac.new(K, salt, sha256).hexdigest() else 'FAIL'
-
-
     def make_credential(N, g, P):
         salt = random_key(16)
         xH = sha256(salt + P).hexdigest()
@@ -591,7 +580,7 @@ Crack the password from A's HMAC-SHA256(K, salt).
         return salt, v
 
 
-    def server(N, g, k, credentials):
+    def server(N, g, credentials):
         I, A = (yield)
         salt, v = credentials[I]
         b, B = make_keys(N, g)
@@ -603,9 +592,10 @@ Crack the password from A's HMAC-SHA256(K, salt).
 
 
     email, password = 'vanilla@ice.com', random_word()
+    print 'Password:', password
     credentials = {email: make_credential(p, g, password)}
     #prime the pump
-    c, s = client(p, g, 3, email, password), server(p, g, 3, credentials)
+    c, s = client(p, g, email, password), server(p, g, credentials)
     c_s, _ = c.next(), s.next()
     while c_s:
         print '\tC->S:', c_s
@@ -614,6 +604,37 @@ Crack the password from A's HMAC-SHA256(K, salt).
         print '\tS->C:', s_c
         c_s = c.send(s_c)
 
+
+    def mitm_server(N, g, words):
+        I, A = (yield)
+        salt = random_key(16)
+        b, B = make_keys(N, g)
+        u = random.randint(0, 2**128 - 1)
+        h = (yield salt, B, u)
+
+        for i, word in enumerate(words):
+            xH = sha256(salt + word).hexdigest()
+            x = int(xH, 16)
+            v = pow(g, x, N)
+            S = pow(A * pow(v, u, N), b, N)
+            K = sha256(str(S)).hexdigest()
+            if h == hmac.new(K, salt, sha256).hexdigest():
+                print 'Found Password:', word
+                break
+        yield 'OK'
+
+
+    words = [line.strip() for line in open('/usr/share/dict/words')]
+    random.shuffle(words)
+    #prime the pump
+    c, s = client(p, g, email, password), mitm_server(p, g, words)
+    c_s, _ = c.next(), s.next()
+    while c_s:
+        print '\tC->S:', c_s
+        s_c = s.send(c_s)
+
+        print '\tS->C:', s_c
+        c_s = c.send(s_c)
 
 
 def cc39():
