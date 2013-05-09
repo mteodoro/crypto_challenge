@@ -6,6 +6,7 @@ import random
 import itertools
 
 from Crypto.Cipher import AES
+from Crypto.Util.number import getStrongPrime
 
 random.seed('matasano') #for reproducibility - will work with any seed
 
@@ -619,7 +620,9 @@ Crack the password from A's HMAC-SHA256(K, salt).
             S = pow(A * pow(v, u, N), b, N)
             K = sha256(str(S)).hexdigest()
             if h == hmac.new(K, salt, sha256).hexdigest():
+                print
                 print 'Found Password:', word
+                print
                 break
         yield 'OK'
 
@@ -683,6 +686,42 @@ Finally, to encrypt a string, do something cheesy, like convert the
 string to hex and put "0x" on the front of it to turn it into a
 number. The math cares not how stupidly you feed it strings.
 """
+    def invmod(a, b):
+        m = b
+        x, lastx = 0, 1
+        y, lasty = 1, 0
+        while b:
+            q = a / b
+            a, b = b, a % b
+            x, lastx = lastx - q * x, x
+            y, lasty = lasty - q * y, y
+        return lastx % m
+
+
+    def encrypt(m, e, n):
+        m = long(m.encode('hex'), 16)
+        return pow(m, e, n)
+
+
+    def decrypt(c, d, n):
+        m = pow(c, d, n)
+        m = hex(long(m))
+        return m[2:-1].decode('hex')
+
+
+    bits = 1024
+    e = 3
+    p, q = getStrongPrime(bits, e), getStrongPrime(bits, e)
+    n = p * q
+    et = (p-1) * (q-1)
+    d = invmod(e, et)
+
+    m = "Cooking MC's like a pound of bacon"
+    print 'Encrypting:', m
+    c = encrypt(m, e, n)
+    print 'c:', c
+    m = decrypt(c, d, n)
+    print 'Decrypted: ', m
 
 
 def cc40():
