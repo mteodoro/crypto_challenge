@@ -72,6 +72,18 @@ def aes_decrypt(key, iv, data, mode=AES.MODE_CBC):
     return pkcs7_strip(AES.new(key, IV=iv, mode=mode).decrypt(data))
 
 
+def invmod(a, b):
+    m = b
+    x, lastx = 0, 1
+    y, lasty = 1, 0
+    while b:
+        q = a / b
+        a, b = b, a % b
+        x, lastx = lastx - q * x, x
+        y, lasty = lasty - q * y, y
+    return lastx % m
+
+
 def cc33():
     """33. Implement Diffie-Hellman
 
@@ -686,18 +698,6 @@ Finally, to encrypt a string, do something cheesy, like convert the
 string to hex and put "0x" on the front of it to turn it into a
 number. The math cares not how stupidly you feed it strings.
 """
-    def invmod(a, b):
-        m = b
-        x, lastx = 0, 1
-        y, lasty = 1, 0
-        while b:
-            q = a / b
-            a, b = b, a % b
-            x, lastx = lastx - q * x, x
-            y, lasty = lasty - q * y, y
-        return lastx % m
-
-
     def encrypt(m, e, n):
         m = long(m.encode('hex'), 16)
         return pow(m, e, n)
@@ -766,6 +766,50 @@ To decrypt RSA using a simple cube root, leave off the
 final modulus operation; just take the raw accumulated result and
 cube-root it.
 """
+    #http://stackoverflow.com/a/358134
+    def nth_root(x,n):
+        """Finds the integer component of the n'th root of x,
+        an integer such that y ** n <= x < (y + 1) ** n.
+        """
+        high = 1
+        while high ** n < x:
+            high *= 2
+        low = high/2
+        while low < high:
+            mid = (low + high) // 2
+            if low < mid and mid**n < x:
+                low = mid
+            elif high > mid and mid**n > x:
+                high = mid
+            else:
+                return mid
+        return mid + 1
+
+
+    m = "Now that the party is jumping"
+    print 'Encrypting:', m
+    m = long(m.encode('hex'), 16)
+    bits = 1024
+    e = 3
+
+    pubkeys = [getStrongPrime(bits, e) * getStrongPrime(bits, e) for _ in xrange(3)]
+    captures = [pow(m, e, n) for n in pubkeys]
+
+    c0, c1, c2 = [c % n for c,n in zip(captures, pubkeys)]
+    n0, n1, n2 = pubkeys
+    ms0 = n1 * n2
+    ms1 = n0 * n2
+    ms2 = n0 * n1
+    N012 = n0 * n1 * n2
+
+    result = ((c0 * ms0 * invmod(ms0, n0)) +
+            (c1 * ms1 * invmod(ms1, n1)) +
+            (c2 * ms2 * invmod(ms2, n2))) % N012
+
+    m = nth_root(result, 3)
+    m = hex(long(m))
+    m = m[2:-1].decode('hex')
+    print 'Decrypted: ', m
 
 
 if __name__ == '__main__':
