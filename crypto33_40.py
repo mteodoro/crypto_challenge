@@ -152,8 +152,7 @@ routines on Rosetta Code for most languages.
 
 
 def cc34():
-    """34. Implement a MITM key-fixing attack on Diffie-Hellman with
-parameter injection
+    """34. Implement a MITM key-fixing attack on Diffie-Hellman with parameter injection
 
 Use the code you just worked out to build a protocol and an
 "echo" bot. You don't actually have to do the network part of this
@@ -224,7 +223,7 @@ injection attack; it's going to come up again.
     a, b = alice(p, g, msg), bob()
     a_b, _ = a.next(), b.next()
     #exchange key material and bounce msg
-    while a_b:
+    while a_b is not None:
         print '\tA->B:', a_b
         b_a = b.send(a_b)
 
@@ -246,14 +245,13 @@ injection attack; it's going to come up again.
             a_b = (yield b_a)
 
     print
-    print
 
     msg = random_word()
     #prime the pump
     a, m, b = alice(p, g, msg), mallory(), bob()
     a_m, _, _ = a.next(), m.next(), b.next()
     #exchange key material and bounce msg
-    while a_m:
+    while a_m is not None:
         print '\tA->M:', a_m
         m_b = m.send(a_m)
 
@@ -325,7 +323,7 @@ Write attacks for each.
     a, b = alice(p, g, msg), bob()
     a_b, _ = a.next(), b.next()
     #exchange key material and bounce msg
-    while a_b:
+    while a_b is not None:
         print '\tA->B:', a_b
         b_a = b.send(a_b)
 
@@ -364,14 +362,14 @@ Write attacks for each.
     print
     print
 
-    for g, comment in [(1, 'g = 1'), (p, 'g = p'), (p-1, 'g = p - 1')]:
+    for g, comment in [(1, 'g == 1'), (p, 'g == p'), (p-1, 'g == p - 1')]:
         msg = random_word()
         print 'Attack with msg: %s, %s:' % (msg, comment)
         #prime the pump
         a, m, b = alice(p, g, msg), mallory(), bob()
         a_m, _, _ = a.next(), m.next(), b.next()
         #exchange key material and bounce msg
-        while a_m:
+        while a_m is not None:
             print '\tA->M:', a_m
             m_b = m.send(a_m)
 
@@ -472,7 +470,7 @@ an easily crackable password-equivalent.
     #prime the pump
     c, s = client(p, g, 3, email, password), server(p, g, 3, credentials)
     c_s, _ = c.next(), s.next()
-    while c_s:
+    while c_s is not None:
         print '\tC->S:', c_s
         s_c = s.send(c_s)
 
@@ -533,7 +531,7 @@ Now log in without your password by having the client send N, N*2, &c.
         #prime the pump
         c, s = client_A(p, g, 3, email, A), server(p, g, 3, credentials)
         c_s, _ = c.next(), s.next()
-        while c_s:
+        while c_s is not None:
             print '\tC->S:', c_s
             s_c = s.send(c_s)
 
@@ -610,7 +608,7 @@ Crack the password from A's HMAC-SHA256(K, salt).
     #prime the pump
     c, s = client(p, g, email, password), server(p, g, credentials)
     c_s, _ = c.next(), s.next()
-    while c_s:
+    while c_s is not None:
         print '\tC->S:', c_s
         s_c = s.send(c_s)
 
@@ -644,7 +642,7 @@ Crack the password from A's HMAC-SHA256(K, salt).
     #prime the pump
     c, s = client(p, g, email, password), mitm_server(p, g, words)
     c_s, _ = c.next(), s.next()
-    while c_s:
+    while c_s is not None:
         print '\tC->S:', c_s
         s_c = s.send(c_s)
 
