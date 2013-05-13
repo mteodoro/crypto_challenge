@@ -18,15 +18,21 @@ def invmod(a, b):
     return lastx % m
 
 
+def long_encode(m):
+    return long(m.encode('hex'), 16)
+
+
+def long_decode(m):
+    m = hex(long(m))
+    return m[2:-1].decode('hex')
+
+
 def rsa_encrypt(m, e, n):
-    m = long(m.encode('hex'), 16)
     return pow(m, e, n)
 
 
 def rsa_decrypt(c, d, n):
-    m = pow(c, d, n)
-    m = hex(long(m))
-    return m[2:-1].decode('hex')
+    return pow(c, d, n)
 
 
 def rsa_genkeys(bits, e):
@@ -91,7 +97,7 @@ Implement that attack.
     keypairs = {}
     def decrypt(pubkey, msg):
         if msg in seen or pubkey not in keypairs:
-            return "NICE TRY"
+            return long_encode('ERROR')
         seen.add(msg)
 
         privkey = keypairs[pubkey]
@@ -103,10 +109,17 @@ Implement that attack.
 
     msg = "Cooking MC's like a pound of bacon"
     print 'Encrypting:', msg
-    msg = rsa_encrypt(msg, *pubkey)
-    print 'Decrypted: ', decrypt(pubkey, msg)
-    print 'Replaying: ', decrypt(pubkey, msg)
+    C = rsa_encrypt(long_encode(msg), *pubkey)
+    print 'Decrypted: ', long_decode(decrypt(pubkey, C))
+    print 'Replayed:  ', long_decode(decrypt(pubkey, C))
 
+    E, N = pubkey
+    S = random.randint(1, N)
+    C_prime = (pow(S, E, N) * C) % N
+
+    P_prime = decrypt(pubkey, C_prime)
+    P = (P_prime * invmod(S, N)) % N
+    print 'Recovered: ', long_decode(P)
 
 
 def cc42():
