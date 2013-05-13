@@ -1,5 +1,8 @@
 #!/usr/bin/env python
+import hashlib
+import json
 import random
+import time
 
 from Crypto.Util.number import getStrongPrime
 
@@ -28,11 +31,11 @@ def long_decode(m):
 
 
 def rsa_encrypt(m, e, n):
-    return pow(m, e, n)
+    return pow(long_encode(m), e, n)
 
 
 def rsa_decrypt(c, d, n):
-    return pow(c, d, n)
+    return long_decode(pow(c, d, n))
 
 
 def rsa_genkeys(bits, e):
@@ -95,29 +98,31 @@ Implement that attack.
 """
     seen = set()
     keypairs = {}
-    def decrypt(pubkey, msg):
-        if msg in seen or pubkey not in keypairs:
-            return long_encode('ERROR')
-        seen.add(msg)
+    def decrypt(pubkey, C):
+        h = hashlib.sha1(long_decode(C)).hexdigest()
+        if h in seen or pubkey not in keypairs:
+            return 'ERROR'
+        seen.add(h)
 
         privkey = keypairs[pubkey]
-        return rsa_decrypt(msg, *privkey)
+        return rsa_decrypt(C, *privkey)
 
 
     pubkey, privkey = rsa_genkeys(bits=1024, e=3)
     keypairs[pubkey] = privkey
 
-    msg = "Cooking MC's like a pound of bacon"
+    msg = json.dumps({'time': int(time.time()), 'social': '078-05-1120'})
     print 'Encrypting:', msg
-    C = rsa_encrypt(long_encode(msg), *pubkey)
-    print 'Decrypted: ', long_decode(decrypt(pubkey, C))
-    print 'Replayed:  ', long_decode(decrypt(pubkey, C))
+    C = rsa_encrypt(msg, *pubkey)
+    print 'Decrypted: ', decrypt(pubkey, C)
+    print 'Replayed:  ', decrypt(pubkey, C)
 
     E, N = pubkey
     S = random.randint(1, N)
     C_prime = (pow(S, E, N) * C) % N
 
     P_prime = decrypt(pubkey, C_prime)
+    P_prime = long_encode(P_prime)
     P = (P_prime * invmod(S, N)) % N
     print 'Recovered: ', long_decode(P)
 
