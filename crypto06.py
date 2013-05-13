@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import random
 
+from Crypto.Util.number import getStrongPrime
+
 random.seed('matasano') #for reproducibility - will work with any seed
 
 
@@ -14,6 +16,26 @@ def invmod(a, b):
         x, lastx = lastx - q * x, x
         y, lasty = lasty - q * y, y
     return lastx % m
+
+
+def rsa_encrypt(m, e, n):
+    m = long(m.encode('hex'), 16)
+    return pow(m, e, n)
+
+
+def rsa_decrypt(c, d, n):
+    m = pow(c, d, n)
+    m = hex(long(m))
+    return m[2:-1].decode('hex')
+
+
+def rsa_genkeys(bits, e):
+    bits = bits / 2
+    p, q = getStrongPrime(bits, e), getStrongPrime(bits, e)
+    n = p * q
+    et = (p-1) * (q-1)
+    d = invmod(e, et)
+    return (e,n), (d,n)
 
 
 def cc41():
@@ -65,6 +87,26 @@ multiplicative inverse mod N.)
 
 Implement that attack.
 """
+    seen = set()
+    keypairs = {}
+    def decrypt(pubkey, msg):
+        if msg in seen or pubkey not in keypairs:
+            return "NICE TRY"
+        seen.add(msg)
+
+        privkey = keypairs[pubkey]
+        return rsa_decrypt(msg, *privkey)
+
+
+    pubkey, privkey = rsa_genkeys(bits=1024, e=3)
+    keypairs[pubkey] = privkey
+
+    msg = "Cooking MC's like a pound of bacon"
+    print 'Encrypting:', msg
+    msg = rsa_encrypt(msg, *pubkey)
+    print 'Decrypted: ', decrypt(pubkey, msg)
+    print 'Replaying: ', decrypt(pubkey, msg)
+
 
 
 def cc42():
