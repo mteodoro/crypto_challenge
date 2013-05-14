@@ -1,10 +1,15 @@
 #!/usr/bin/env python
+import binascii
 import hashlib
 import json
 import random
 import time
 
+import Crypto.Hash.SHA as SHA
+import Crypto.PublicKey.RSA as RSA
+import Crypto.Signature.PKCS1_v1_5 as PKCS1_v1_5
 from Crypto.Util.number import getStrongPrime
+
 
 random.seed('matasano') #for reproducibility - will work with any seed
 
@@ -21,12 +26,34 @@ def invmod(a, b):
     return lastx % m
 
 
+#http://stackoverflow.com/a/358134
+def nth_root(x,n):
+    """Finds the integer component of the n'th root of x,
+    an integer such that y ** n <= x < (y + 1) ** n.
+    """
+    high = 1
+    while high ** n < x:
+        high *= 2
+    low = high/2
+    while low < high:
+        mid = (low + high) // 2
+        if low < mid and mid**n < x:
+            low = mid
+        elif high > mid and mid**n > x:
+            high = mid
+        else:
+            return mid
+    return mid + 1
+
+
 def long_encode(m):
     return long(m.encode('hex'), 16)
 
 
 def long_decode(m):
+    print '!!!', m
     m = hex(long(m))
+    print '!!!', m
     return m[2:-1].decode('hex')
 
 
@@ -186,6 +213,58 @@ There are two ways to approach this problem:
 Forge a 1024-bit RSA signature for the string "hi mom". Make sure your
 implementation actually accepts the signature!
 """
+    msg = "hi mom"
+
+    #generate sig with throwaway key to get asn1+hash
+    key = RSA.generate(1024, e=3)
+    h = SHA.new(msg)
+    ss = PKCS1_v1_5.new(key)
+    psig = ss.sign(h)
+    raw = key.encrypt(psig, 0)[0]
+    print raw.encode('hex')
+
+    #build the new block
+
+    print 'start'
+    asn1_hash = raw[raw.find('\xff\x00')+1:]
+    padlen = len(raw) - len(asn1_hash)
+    for i in xrange(1, padlen):
+        prefix = '\x01' + '\xff' * i
+        suffix = '\x01' * ((padlen - i) - 1)
+        sig = prefix + asn1_hash + suffix
+        #print sig.encode('hex')
+        x = long_encode(sig)
+        newsig = nth_root(x, 3)
+        print hex(newsig ** 3)[len(prefix.encode('hex')):255-len(suffix.encode('hex'))]
+
+
+    print 'start'
+    asn1_hash = raw[raw.find('\xff\x00')+1:]
+    prefix = '\x01' + '\xff' * 4
+    suffix = '\x01' * 87
+    sig = prefix + asn1_hash + suffix
+    #print sig.encode('hex')
+    x = long_encode(sig)
+    newsig = nth_root(x, 3)
+    print hex(newsig ** 3)
+
+
+    return
+
+
+    print asn1_hash.encode('hex')
+    print sig.encode('hex')
+    print len(sig)
+    x = long_encode(sig)
+    print hex(x)[:80]
+    newsig = nth_root(x, 3)
+
+    #print newsig
+    #print newsig ** 3
+    print hex(newsig ** 3)[:80]
+
+    print hashlib.sha1(msg).hexdigest()
+
 
 
 def cc43():
@@ -521,7 +600,8 @@ does not work well in practice*
 
 
 if __name__ == '__main__':
-    for f in (cc41, cc42, cc43, cc44, cc45, cc46, cc47, cc48):
+    #for f in (cc41, cc42, cc43, cc44, cc45, cc46, cc47, cc48):
+    for f in (cc42, cc43, cc44, cc45, cc46, cc47, cc48):
         print f.__doc__.split('\n')[0]
         f()
         print
