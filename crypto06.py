@@ -8,7 +8,7 @@ import time
 import Crypto.Hash.SHA as SHA
 import Crypto.PublicKey.RSA as RSA
 import Crypto.Signature.PKCS1_v1_5 as PKCS1_v1_5
-from Crypto.Util.number import getStrongPrime
+from Crypto.Util.number import bytes_to_long, long_to_bytes, getStrongPrime
 
 
 random.seed('matasano') #for reproducibility - will work with any seed
@@ -46,23 +46,12 @@ def nth_root(x,n):
     return mid + 1
 
 
-def long_encode(m):
-    return long(m.encode('hex'), 16)
-
-
-def long_decode(m):
-    print '!!!', m
-    m = hex(long(m))
-    print '!!!', m
-    return m[2:-1].decode('hex')
-
-
 def rsa_encrypt(m, e, n):
-    return pow(long_encode(m), e, n)
+    return pow(bytes_to_long(m), e, n)
 
 
 def rsa_decrypt(c, d, n):
-    return long_decode(pow(c, d, n))
+    return long_to_bytes(pow(c, d, n))
 
 
 def rsa_genkeys(bits, e):
@@ -126,7 +115,7 @@ Implement that attack.
     seen = set()
     keypairs = {}
     def decrypt(pubkey, C):
-        h = hashlib.sha1(long_decode(C)).hexdigest()
+        h = hashlib.sha1(long_to_bytes(C)).hexdigest()
         if h in seen or pubkey not in keypairs:
             return 'ERROR'
         seen.add(h)
@@ -149,9 +138,9 @@ Implement that attack.
     C_prime = (pow(S, E, N) * C) % N
 
     P_prime = decrypt(pubkey, C_prime)
-    P_prime = long_encode(P_prime)
+    P_prime = bytes_to_long(P_prime)
     P = (P_prime * invmod(S, N)) % N
-    print 'Recovered: ', long_decode(P)
+    print 'Recovered: ', long_to_bytes(P)
 
 
 def cc42():
@@ -224,6 +213,20 @@ implementation actually accepts the signature!
     print raw.encode('hex')
 
     #build the new block
+    asn1_hash = raw[raw.find('\xff\x00')+1:]
+    prefix = '\x01' + '\xff' * 4
+    suffix = '\x01' * 87
+    sig = prefix + asn1_hash + suffix
+    #print sig.encode('hex')
+    x = bytes_to_long(sig)
+    newsig = nth_root(x, 3)
+    #print newsig
+    print long_to_bytes(newsig ** 3).encode('hex')
+    print long_to_bytes(key.encrypt(newsig, 0)[0]).encode('hex')
+
+
+    return
+
 
     print 'start'
     asn1_hash = raw[raw.find('\xff\x00')+1:]
@@ -239,17 +242,6 @@ implementation actually accepts the signature!
 
 
     print 'start'
-    asn1_hash = raw[raw.find('\xff\x00')+1:]
-    prefix = '\x01' + '\xff' * 4
-    suffix = '\x01' * 87
-    sig = prefix + asn1_hash + suffix
-    #print sig.encode('hex')
-    x = long_encode(sig)
-    newsig = nth_root(x, 3)
-    print hex(newsig ** 3)
-
-
-    return
 
 
     print asn1_hash.encode('hex')
@@ -600,8 +592,7 @@ does not work well in practice*
 
 
 if __name__ == '__main__':
-    #for f in (cc41, cc42, cc43, cc44, cc45, cc46, cc47, cc48):
-    for f in (cc42, cc43, cc44, cc45, cc46, cc47, cc48):
+    for f in (cc41, cc42, cc43, cc44, cc45, cc46, cc47, cc48):
         print f.__doc__.split('\n')[0]
         f()
         print
