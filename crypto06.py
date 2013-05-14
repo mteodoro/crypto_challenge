@@ -82,6 +82,44 @@ dsa_g = long(''.join("""
 9fc95302291""".strip().split()), 16)
 
 
+def dsa_genkeys(p, q, g):
+    x = random.randrange(1, q)
+    y = pow(g, x, p)
+    return (p,q,g,y), x
+
+
+def dsa_sign(p, q, g, x, h, leak_k=False):
+    r, s = 0, 0
+    while r == 0 or s == 0:
+        k = random.randrange(1, q)
+        r = pow(g, k, p) % q
+        #s = invmod(h + x*r, q)
+        s = (invmod(k, q) * (h + x*r)) % q
+    if leak_k:
+        return (r, s), k
+    return r, s
+
+
+def dsa_verify(pubkey, h, sig):
+    p, q, g, y = pubkey
+    r, s = sig
+    if not 0 < r < q:
+        return False
+    if not 0 < s < q:
+        return False
+
+    w = invmod(s, q)
+    u1 = (h * w) % q
+    u2 = (r * w) % q
+    v = ((pow(g, u1, p) * pow(y, u2, p)) % p) % q
+    return v == r
+
+
+def dsa_recover_x(q, h, sig, k):
+    r, s = sig
+    return (((s * k) - h) * invmod(r, q) % q)
+
+
 def cc41():
     """41. Implement Unpadded Message Recovery Oracle
 
@@ -346,51 +384,9 @@ Its SHA-1 fingerprint (after being converted to hex) is:
 Obviously, it also generates the same signature for that string.
 """
     p, q, g = dsa_p, dsa_q, dsa_g
-
-    def sha1_long(msg):
-        return bytes_to_long(hashlib.sha1(msg).digest())
-
-
-    def dsa_genkeys(p, q, g):
-        x = random.randrange(1, q)
-        y = pow(g, x, p)
-        return (p,q,g,y), x
-
-
-    def dsa_sign(p, q, g, x, h, leak_k=False):
-        r, s = 0, 0
-        while r == 0 or s == 0:
-            k = random.randrange(1, q)
-            r = pow(g, k, p) % q
-            #s = invmod(h + x*r, q)
-            s = (invmod(k, q) * (h + x*r)) % q
-        if leak_k:
-            return (r, s), k
-        return r, s
-
-
-    def dsa_verify(pubkey, h, sig):
-        p, q, g, y = pubkey
-        r, s = sig
-        if not 0 < r < q:
-            return False
-        if not 0 < s < q:
-            return False
-
-        w = invmod(s, q)
-        u1 = (h * w) % q
-        u2 = (r * w) % q
-        v = ((pow(g, u1, p) * pow(y, u2, p)) % p) % q
-        return v == r
-
-
-    def dsa_recover_privkey(q, h, sig, k):
-        r, s = sig
-        return (((s * k) - h) * invmod(r, q) % q)
-
+    h = 0xd2d0714f014a9784047eaeccf956520045c45265
 
     #test out signing/verifying
-    h = 0xd2d0714f014a9784047eaeccf956520045c45265
     print 'Signing/verifying hash:', hex(h)
     pubkey, x = dsa_genkeys(p, q, g)
     sig = dsa_sign(p, q, g, x, h)
@@ -402,12 +398,8 @@ Obviously, it also generates the same signature for that string.
 
     sig, k = dsa_sign(p, q, g, x, h, leak_k=True)
     print 'Leaking k:', k
-    print 'Recovered private key %s: %s' % (x, x == dsa_recover_privkey(q, h, sig, k))
-
-
-
-    return
-
+    print 'Recovered x:', x, 'Match:', x == dsa_recover_x(q, h, sig, k)
+    print
 
     y = long(''.join("""
 84ad4719d044495496a3201c8ff484feb45b962e7302e56a392aee4
@@ -416,23 +408,22 @@ e44984e2f411788efdc837a0d2e5abb7b555039fd243ac01f0fb2ed
 1dec568280ce678e931868d23eb095fde9d3779191b8c0299d6e07b
 bb283e6633451e535c45513b2d33c99ea17""".strip().split()), 16)
 
-    h = 0xd2d0714f014a9784047eaeccf956520045c45265
     r = 548099063082341131477253921760299949438196259240
     s = 857042759984254168557880549501802188789837994940
+    x_hash = '0954edd5e0afe5542a4adf012611a91912a3ec16'
 
     pubkey = p, q, g, y
     sig = r, s
 
-    print dsa_verify(pubkey, h, sig)
-
-
-
-
-    return
     for k in xrange(1, 2**16 + 1):
-        r = pow(g, k, p) % q
-        if r == 548099063082341131477253921760299949438196259240:
-            print k
+        rx = pow(g, k, p) % q
+        if rx == r:
+            break
+
+    print 'Found k candidate:', k
+    x = dsa_recover_x(q, h, sig, k)
+    match = x_hash == hashlib.sha1(hex(x)[2:-1]).hexdigest()
+    print 'Recovered x:', x, 'Match:', match
 
 
 def cc44():
@@ -688,8 +679,7 @@ does not work well in practice*
 
 
 if __name__ == '__main__':
-    #for f in (cc41, cc42, cc43, cc44, cc45, cc46, cc47, cc48):
-    for f in (cc43, cc44, cc45, cc46, cc47, cc48):
+    for f in (cc41, cc42, cc43, cc44, cc45, cc46, cc47, cc48):
         print f.__doc__.split('\n')[0]
         f()
         print
