@@ -98,12 +98,12 @@ def dsa_genkeys(p, q, g):
 
 
 def dsa_sign(p, q, g, x, h, leak_k=False):
-    r, s = 0, 0
-    while r == 0 or s == 0:
-        k = random.randrange(1, q)
-        r = pow(g, k, p) % q
-        #s = invmod(h + x*r, q)
-        s = (invmod(k, q) * (h + x*r)) % q
+    #relax constraints for problem 45
+    #r, s = 0, 0
+    #while r == 0 or s == 0:
+    k = random.randrange(1, q)
+    r = pow(g, k, p) % q
+    s = (invmod(k, q) * (h + x*r)) % q
     if leak_k:
         return (r, s), k
     return r, s
@@ -112,10 +112,11 @@ def dsa_sign(p, q, g, x, h, leak_k=False):
 def dsa_verify(pubkey, h, sig):
     p, q, g, y = pubkey
     r, s = sig
-    if not 0 < r < q:
-        return False
-    if not 0 < s < q:
-        return False
+    #relax constraints for problem 45
+    #if not 0 < r < q:
+    #    return False
+    #if not 0 < s < q:
+    #    return False
 
     w = invmod(s, q)
     u1 = (h * w) % q
@@ -406,8 +407,9 @@ Obviously, it also generates the same signature for that string.
     print
 
     sig, k = dsa_sign(p, q, g, x, h, leak_k=True)
-    print 'Leaking k:', k
-    print 'Recovered x:', x, 'Match:', x == dsa_recover_x(q, h, sig, k)
+    print 'Leaked k:', k
+    print 'Recovered x:', x
+    print 'Match:', x == dsa_recover_x(q, h, sig, k)
     print
 
     y = long(''.join("""
@@ -429,10 +431,10 @@ bb283e6633451e535c45513b2d33c99ea17""".strip().split()), 16)
         if rx == r:
             break
 
-    print 'Found k candidate:', k
+    print 'Found k:', k
     x = dsa_recover_x(q, h, sig, k)
-    match = x_hash == hashlib.sha1(hex(x)[2:-1]).hexdigest()
-    print 'Recovered x:', x, 'Match:', match
+    print 'Recovered x:', x
+    print 'Match:', x_hash == hashlib.sha1(hex(x)[2:-1]).hexdigest()
 
 
 def cc44():
@@ -501,10 +503,10 @@ f98a6a4d83d8279ee65d71c1203d2c96d65ebbf7cce9d3
     s = (s1 - s2) % q
     k = m * invmod(s, q)
 
-    print 'Found k candidate:', k
+    print 'Found k:', k
     x = dsa_recover_x(q, m1, (r1, s1), k)
-    match = x_hash == hashlib.sha1(hex(x)[2:-1]).hexdigest()
-    print 'Recovered x:', x, 'Match:', match
+    print 'Recovered x:', x
+    print 'Match:', x_hash == hashlib.sha1(hex(x)[2:-1]).hexdigest()
 
 
 def cc45():
@@ -535,6 +537,39 @@ string. For arbitrary z:
 
 Sign "Hello, world". And "Goodbye, world".
 """
+    h = 0xd2d0714f014a9784047eaeccf956520045c45265
+    p, q = dsa_p, dsa_q
+
+    g = 0
+    pubkey, x = dsa_genkeys(p, q, g)
+    print 'If g == 0, r will also, and any signature or hash will validate'
+    print 'Signing/verifying hash:', hex(h)
+    sig = dsa_sign(p, q, g, x, h)
+    print '(r, s):', sig
+    print 'Verified:', dsa_verify(pubkey, h, sig)
+    print
+    print 'Verifying bad hash:', hex(h+42)
+    print 'Verified:', dsa_verify(pubkey, h+42, sig)
+    r, s = sig
+    print 'Verifying bad sig:', (r, s+42)
+    print 'Verified:', dsa_verify(pubkey, h, (r, s+42))
+    print
+
+    g = p + 1
+    pubkey, x = dsa_genkeys(p, q, g)
+    y = pubkey[-1]
+
+    def dsa_sign_magic(p, q, y, z):
+        r = pow(y, z, p) % q
+        s = r * invmod(z, q)
+        return r, s
+
+    for msg in ("Hello, world", "Goodbye, world"):
+        h = bytes_to_long(hashlib.sha1(msg).digest())
+        print 'Signing/verifying:', msg
+        sig = dsa_sign_magic(p, q, y, h)
+        print '(r, s):', sig
+        print 'Verified:', dsa_verify(pubkey, h, sig)
 
 
 def cc46():
