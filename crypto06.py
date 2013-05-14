@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import binascii
 import hashlib
+import itertools
 import json
 import random
 import time
@@ -12,6 +13,14 @@ from Crypto.Util.number import bytes_to_long, long_to_bytes, getStrongPrime
 
 
 random.seed('matasano') #for reproducibility - will work with any seed
+
+
+#http://docs.python.org/2/library/itertools.html#recipes
+def grouper(n, iterable, fillvalue=None):
+    "Collect data into fixed-length chunks or blocks"
+    # grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx
+    args = [iter(iterable)] * n
+    return itertools.izip_longest(fillvalue=fillvalue, *args)
 
 
 def invmod(a, b):
@@ -463,6 +472,39 @@ What's my private key? Its SHA-1 (from hex) is:
 
     ca8f6f7c66fa362d40760d135b763eb8527d3d52
 """
+    def gen_messages(fname): 
+        with open(fname) as f:
+            for lines in grouper(4, f, ''):
+                msg, s, r, m = [x.strip('\n').split(':')[1][1:] for x in lines]
+                yield msg, long(s), long(r), long(m, 16)
+
+
+    y = long(''.join("""
+2d026f4bf30195ede3a088da85e398ef869611d0f68f07
+13d51c9c1a3a26c95105d915e2d8cdf26d056b86b8a7b8
+5519b1c23cc3ecdc6062650462e3063bd179c2a6581519
+f674a61f1d89a1fff27171ebc1b93d4dc57bceb7ae2430
+f98a6a4d83d8279ee65d71c1203d2c96d65ebbf7cce9d3
+2971c3de5084cce04a2e147821""".strip().split()), 16)
+    x_hash = 'ca8f6f7c66fa362d40760d135b763eb8527d3d52'
+    p, q, g = dsa_p, dsa_q, dsa_g
+
+    #r = pow(g, k, p) % q, so signatures with shared k will share r
+    r_data = {}
+    for msg1, s1, r1, m1 in gen_messages('data/cc44.txt'):
+        if r1 in r_data:
+            msg2, s2, m2 = r_data[r1]
+            break
+        r_data[r1] = msg1, s1, m1
+
+    m = (m1 - m2) % q
+    s = (s1 - s2) % q
+    k = m * invmod(s, q)
+
+    print 'Found k candidate:', k
+    x = dsa_recover_x(q, m1, (r1, s1), k)
+    match = x_hash == hashlib.sha1(hex(x)[2:-1]).hexdigest()
+    print 'Recovered x:', x, 'Match:', match
 
 
 def cc45():
