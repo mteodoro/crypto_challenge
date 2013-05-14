@@ -357,13 +357,15 @@ Obviously, it also generates the same signature for that string.
         return (p,q,g,y), x
 
 
-    def dsa_sign(p, q, g, x, h):
+    def dsa_sign(p, q, g, x, h, leak_k=False):
         r, s = 0, 0
         while r == 0 or s == 0:
             k = random.randrange(1, q)
             r = pow(g, k, p) % q
             #s = invmod(h + x*r, q)
             s = (invmod(k, q) * (h + x*r)) % q
+        if leak_k:
+            return (r, s), k
         return r, s
 
 
@@ -382,10 +384,27 @@ Obviously, it also generates the same signature for that string.
         return v == r
 
 
+    def dsa_recover_privkey(q, h, sig, k):
+        r, s = sig
+        return (((s * k) - h) * invmod(r, q) % q)
+
+
+    #test out signing/verifying
     h = 0xd2d0714f014a9784047eaeccf956520045c45265
+    print 'Signing/verifying hash:', hex(h)
     pubkey, x = dsa_genkeys(p, q, g)
     sig = dsa_sign(p, q, g, x, h)
-    print dsa_verify(pubkey, h, sig)
+    print 'Verified:', dsa_verify(pubkey, h, sig)
+    print
+    print 'Verifying bad hash:', hex(h+42)
+    print 'Verified:', dsa_verify(pubkey, h+42, sig)
+    print
+
+    sig, k = dsa_sign(p, q, g, x, h, leak_k=True)
+    print 'Leaking k:', k
+    print 'Recovered private key %s: %s' % (x, x == dsa_recover_privkey(q, h, sig, k))
+
+
 
     return
 
