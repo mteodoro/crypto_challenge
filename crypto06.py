@@ -202,38 +202,10 @@ There are two ways to approach this problem:
 Forge a 1024-bit RSA signature for the string "hi mom". Make sure your
 implementation actually accepts the signature!
 """
-
-    def broken_verify(key, mhash, S):
-        import Crypto.Util.number
-        from Crypto.Signature.PKCS1_v1_5 import EMSA_PKCS1_V1_5_ENCODE
-        # See 8.2.2 in RFC3447
-        modBits = Crypto.Util.number.size(key.n)
-        k = Crypto.Util.number.ceil_div(modBits,8) # Convert from bits to bytes
-        print modBits, k, len(S)
-        # Step 1
-        #if len(S) != k:
-        #    return 0
-        # Step 2a (O2SIP) and 2b (RSAVP1)
-        # Note that signature must be smaller than the module
-        # but RSA.py won't complain about it.
-        # TODO: Fix RSA object; don't do it here.
-        m = key.encrypt(S, 0)[0]
-        # Step 2c (I2OSP)
-        em1 = chr(0x00)*(k-len(m)) + m 
-        # Step 3
-        try:
-            em2 = EMSA_PKCS1_V1_5_ENCODE(mhash, k)
-        except ValueError:
-            return 0
-
-        print em1.encode('hex')
-        print em2.encode('hex')
-        # Step 4
-        # By comparing the full encodings (as opposed to checking each
-        # of its components one at a time) we avoid attacks to the padding
-        # scheme like Bleichenbacher's (see http://www.mail-archive.com/cryptography@metzdowd.com/msg06537).
-        return em1==em2
-
+    print """Note: pycrypto explicitly checks for this attack
+(see https://github.com/dlitz/pycrypto/blob/master/lib/Crypto/Signature/PKCS1_v1_5.py#L159)
+so this uses an intentionally broken signature verifier that doesn't check padding.
+"""
 
     def broken_verify_rsa_sha1(msg, key, sig):
         asn1_sha1 = '\x000!0\t\x06\x05+\x0e\x03\x02\x1a\x05\x00\x04\x14'
@@ -247,9 +219,6 @@ implementation actually accepts the signature!
         return False
 
 
-
-
-
     msg = "hi mom"
 
     #generate sig with throwaway key to get asn1+hash
@@ -257,10 +226,10 @@ implementation actually accepts the signature!
     h = SHA.new(msg)
     ss = PKCS1_v1_5.new(key)
     psig = ss.sign(h)
-    print ss.verify(h, psig)
-    print broken_verify(key, h, psig)
     raw = key.encrypt(psig, 0)[0]
-    print raw.encode('hex')
+    print 'Generate sig with throwaway key to get asn1+hash'
+    print 'Valid Sig:', raw.encode('hex')
+    print 'Verified: ', broken_verify_rsa_sha1(msg, key, psig)
 
     #build the new block
     asn1_hash = raw[raw.find('\xff\x00')+1:]
@@ -269,49 +238,14 @@ implementation actually accepts the signature!
     sig = prefix + asn1_hash + suffix
     #print sig.encode('hex')
     x = bytes_to_long(sig)
-    newsig = long_to_bytes(nth_root(x, 3))
-
-    #print long_to_bytes(newsig).encode('hex')
-    #print newsig
-    #print long_to_bytes(newsig ** 3).encode('hex')
-    #print long_to_bytes(key.encrypt(newsig, 0)[0]).encode('hex')
-
-    key = RSA.generate(1024, e=3)
-    print broken_verify_rsa_sha1(msg, key, newsig)
-
-
-    return
-
-
-    print 'start'
-    asn1_hash = raw[raw.find('\xff\x00')+1:]
-    padlen = len(raw) - len(asn1_hash)
-    for i in xrange(1, padlen):
-        prefix = '\x01' + '\xff' * i
-        suffix = '\x01' * ((padlen - i) - 1)
-        sig = prefix + asn1_hash + suffix
-        #print sig.encode('hex')
-        x = long_encode(sig)
-        newsig = nth_root(x, 3)
-        print hex(newsig ** 3)[len(prefix.encode('hex')):255-len(suffix.encode('hex'))]
-
-
-    print 'start'
-
-
-    print asn1_hash.encode('hex')
-    print sig.encode('hex')
-    print len(sig)
-    x = long_encode(sig)
-    print hex(x)[:80]
     newsig = nth_root(x, 3)
 
-    #print newsig
-    #print newsig ** 3
-    print hex(newsig ** 3)[:80]
-
-    print hashlib.sha1(msg).hexdigest()
-
+    #generate new key with e=3 to test forgery
+    key = RSA.generate(1024, e=3)
+    print
+    print 'Test forgery with new key'
+    print 'Forged Sig:', long_to_bytes(newsig**3).encode('hex')
+    print 'Verified: ', broken_verify_rsa_sha1(msg, key, long_to_bytes(newsig))
 
 
 def cc43():
