@@ -650,7 +650,7 @@ Decrypt the string (after encrypting it to a hidden private key, duh) above.
 
     e, n = pubkey
     lo, hi = Fraction(0), Fraction(n)
-    for _ in xrange(int(math.log(n, 2))):
+    for _ in xrange(int(math.log(n, 2))+1):
         c = (c * pow(2, e, n)) % n
         m = (lo + hi) / 2
         if fcrypt(c):
