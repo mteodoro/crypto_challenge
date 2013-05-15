@@ -753,11 +753,50 @@ trying to grok how the math works.
     msg = "kick it, CC"
     bits = 256
     k = bits/8
-    pubkey, privkey = rsa_genkeys(bits=bits, e=3)
+    #pubkey, privkey = rsa_genkeys(bits=bits, e=3)
+    pubkey = (3, 89943507979383075472115286569058914578384751154000263983274631453373869808129L)
+    privkey = (59962338652922050314743524379372609718522074798827326746601367971340364097923L, 89943507979383075472115286569058914578384751154000263983274631453373869808129L)
     fcrypt = partial(padding_oracle, k, privkey)
-    c = rsa_encrypt(pkcs_pad(k, msg), *pubkey)
-    print fcrypt(c)
-    print fcrypt(bytes_to_long('foobarbaz'))
+    pmsg = pkcs_pad(k, msg)
+    print repr(pmsg)
+    c = rsa_encrypt(pmsg, *pubkey)
+
+    e, n = pubkey
+    B = 2 ** (8 * (k-2))
+    c0 = c #skip blinding (step 1)
+    M = [(2 * B, 3 * B - 1)]
+    i = 1
+
+    while True:
+        if i == 1:
+            #2.a
+            s = n / (3 * B)
+            #DEBUG LOSE THIS
+            s = 69357
+            print 'DEBUG s:', s
+            while not fcrypt(c * pow(s, e, n) % n):
+                s += 1
+            print 'Found s:', s
+
+        elif i > 1 and len(M[i-1]) > 1:
+            #2.b
+            pass
+
+        else:
+            #2.c
+            pass
+
+        #3
+
+
+        break
+        #4
+        if len(M[i]) == 1 and M[i][0][0] == M[i][0][1]:
+            #we're done
+            break
+
+        #try again
+        i += 1
 
 
 def cc48():
