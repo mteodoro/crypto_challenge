@@ -736,13 +736,28 @@ We recommend you just use the raw math from paper (check, check,
 double check your translation to code) and not spend too much time
 trying to grok how the math works.
 """
-    def padding_oracle(privkey, c):
+    def padding_oracle(k, privkey, c):
         m = rsa_decrypt(c, *privkey)
+        m = '\x00' * (k - len(m)) + m #I2OSP
         return m[:2] == '\x00\x02'
 
 
-    pubkey, privkey = rsa_genkeys(bits=256, e=3)
-    print pubkey, privkey
+    def pkcs_pad(k, m):
+        if len(m) > k - 11:
+            raise Exception('m is too long')
+        plen = k - len(m) - 3
+        pad = ''.join(chr(random.randint(1, 255)) for _ in xrange(plen))
+        return ''.join(['\x00\x02', pad, '\x00', m])
+
+
+    msg = "kick it, CC"
+    bits = 256
+    k = bits/8
+    pubkey, privkey = rsa_genkeys(bits=bits, e=3)
+    fcrypt = partial(padding_oracle, k, privkey)
+    c = rsa_encrypt(pkcs_pad(k, msg), *pubkey)
+    print fcrypt(c)
+    print fcrypt(bytes_to_long('foobarbaz'))
 
 
 def cc48():
@@ -793,7 +808,8 @@ does not work well in practice*
 
 
 if __name__ == '__main__':
-    for f in (cc41, cc42, cc43, cc44, cc45, cc46, cc47, cc48):
+    #for f in (cc41, cc42, cc43, cc44, cc45, cc46, cc47, cc48):
+    for f in (cc47, cc48):
         print f.__doc__.split('\n')[0]
         f()
         print
