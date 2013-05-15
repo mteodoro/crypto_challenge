@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import binascii
+from fractions import Fraction
 from functools import partial
 import hashlib
 import itertools
@@ -67,8 +68,7 @@ def rsa_decrypt(c, d, n):
 
 def rsa_genkeys(bits, e):
     bits = bits / 2
-    #p, q = getStrongPrime(bits, e), getStrongPrime(bits, e)
-    p, q = 31, 47
+    p, q = getStrongPrime(bits, e), getStrongPrime(bits, e)
     n = p * q
     et = (p-1) * (q-1)
     d = invmod(e, et)
@@ -637,38 +637,39 @@ Decrypt the string (after encrypting it to a hidden private key, duh) above.
         return rsa_decrypt_long(c, *privkey) & 1
 
 
-    #pubkey, privkey = rsa_genkeys(bits=1024, e=3)
-    pubkey, privkey = rsa_genkeys(bits=1024, e=779)
-    print pubkey, privkey
-    #pubkey, privkey = (101, 203), (5, 203)
+    pubkey, privkey = rsa_genkeys(bits=1024, e=3)
+    #pubkey, privkey, e = (779, 1457), (659, 1457), 779
     fcrypt = partial(parity_oracle, privkey)
     msg = 'VGhhdCdzIHdoeSBJIGZvdW5kIHlvdSBkb24ndCBwbGF5IGFyb3VuZCB3aXRoIHRoZSBGdW5reSBDb2xkIE1lZGluYQ=='
     msg = msg.decode('base64')
     msg = 'abcdefghijklmnopqrstuvwxyz'
-    #msg = '\x00\x01\x02\x03\x04\x05\x06\x06\x08\x09\x10'
     msg = bytes_to_long(msg)
-    msg = 999
+    #msg = 999
     print 'msg:', bin(msg)
     c = rsa_encrypt_long(msg, *pubkey)
     print c
 
     e, n = pubkey
-    lo, hi = 0, n
+    lo, hi = Fraction(0), Fraction(n)
+    r = 0
     i = 0
-    while lo < hi-1:
-    #for _ in xrange(int(math.log(n, 2))):
+    #for _ in xrange(1024):
+    #while lo < hi:
+    for i in xrange(int(math.log(n, 2)) + 1):
         c = (c * pow(2, e, n)) % n
-        m = (hi + lo) / 2
+        #m = (hi + lo + 1) / 2
+        #m, r = divmod(hi + lo + (r // 2), 2)
+        #m, r = divmod(hi + lo, 2)
+        m = (lo + hi) / 2
+        #print r, i, lo, m, hi, long_to_bytes(long(hi))
+        print i, long_to_bytes(long(hi))
         if fcrypt(c):
-            print i, 'odd lo',
             lo = m
         else:
-            print i, 'eve hi',
             hi = m
-        print hi, repr(long_to_bytes(hi))
-        i += 1
 
-    print 'hi ', hi
+    print i, long_to_bytes(long(hi))
+    print 'hi ', long(hi)
     print 'msg', msg
 
 def cc47():
