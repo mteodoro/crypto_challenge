@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 import binascii
+from functools import partial
 import hashlib
 import itertools
 import json
+import math
 import random
 import time
 
@@ -628,7 +630,38 @@ you'll see the message decrypt "hollywood style".
 
 Decrypt the string (after encrypting it to a hidden private key, duh) above.
 """
+    rsa_encrypt_long = pow
+    rsa_decrypt_long = pow
+    def parity_oracle(privkey, c):
+        return rsa_decrypt_long(c, *privkey) & 1
 
+
+    pubkey, privkey = rsa_genkeys(bits=1024, e=3)
+    #pubkey, privkey = (101, 203), (5, 203)
+    fcrypt = partial(parity_oracle, privkey)
+    msg = 'VGhhdCdzIHdoeSBJIGZvdW5kIHlvdSBkb24ndCBwbGF5IGFyb3VuZCB3aXRoIHRoZSBGdW5reSBDb2xkIE1lZGluYQ=='
+    msg = msg.decode('base64')
+    msg = 'abcdefghijklmnopqrstuvwxyz'
+    #msg = '\x00\x01\x02\x03\x04\x05\x06\x06\x08\x09\x10'
+    msg = bytes_to_long(msg)
+    #msg = 5
+    print 'msg:', bin(msg)
+    c = rsa_encrypt_long(msg, *pubkey)
+
+    e, n = pubkey
+    lo, hi = 0, n
+    #while lo < hi:
+    for _ in xrange(int(math.log(n, 2))):
+        m = (hi + lo) // 2
+        if fcrypt(c):
+            lo = m
+        else:
+            hi = m
+        c = (c * pow(2, e, n)) % n
+        print hi, repr(long_to_bytes(hi))
+
+    print 'hi ', hi
+    print 'msg', msg
 
 def cc47():
     """47. Bleichenbacher's PKCS 1.5 Padding Oracle (Simple Case)
@@ -756,7 +789,8 @@ does not work well in practice*
 
 
 if __name__ == '__main__':
-    for f in (cc41, cc42, cc43, cc44, cc45, cc46, cc47, cc48):
+    #for f in (cc41, cc42, cc43, cc44, cc45, cc46, cc47, cc48):
+    for f in (cc46, cc47, cc48):
         print f.__doc__.split('\n')[0]
         f()
         print
