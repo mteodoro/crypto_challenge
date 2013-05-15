@@ -631,46 +631,28 @@ you'll see the message decrypt "hollywood style".
 
 Decrypt the string (after encrypting it to a hidden private key, duh) above.
 """
-    rsa_encrypt_long = pow
     rsa_decrypt_long = pow
     def parity_oracle(privkey, c):
         return rsa_decrypt_long(c, *privkey) & 1
 
 
     pubkey, privkey = rsa_genkeys(bits=1024, e=3)
-    #pubkey, privkey, e = (779, 1457), (659, 1457), 779
     fcrypt = partial(parity_oracle, privkey)
     msg = 'VGhhdCdzIHdoeSBJIGZvdW5kIHlvdSBkb24ndCBwbGF5IGFyb3VuZCB3aXRoIHRoZSBGdW5reSBDb2xkIE1lZGluYQ=='
     msg = msg.decode('base64')
-    msg = 'abcdefghijklmnopqrstuvwxyz'
-    msg = bytes_to_long(msg)
-    #msg = 999
-    print 'msg:', bin(msg)
-    c = rsa_encrypt_long(msg, *pubkey)
-    print c
+    c = rsa_encrypt(msg, *pubkey)
 
     e, n = pubkey
     lo, hi = Fraction(0), Fraction(n)
-    r = 0
-    i = 0
-    #for _ in xrange(1024):
-    #while lo < hi:
-    for i in xrange(int(math.log(n, 2)) + 1):
+    for _ in xrange(int(math.log(n, 2))):
         c = (c * pow(2, e, n)) % n
-        #m = (hi + lo + 1) / 2
-        #m, r = divmod(hi + lo + (r // 2), 2)
-        #m, r = divmod(hi + lo, 2)
         m = (lo + hi) / 2
-        #print r, i, lo, m, hi, long_to_bytes(long(hi))
-        print i, long_to_bytes(long(hi))
         if fcrypt(c):
             lo = m
         else:
             hi = m
+        print long_to_bytes(long(hi))
 
-    print i, long_to_bytes(long(hi))
-    print 'hi ', long(hi)
-    print 'msg', msg
 
 def cc47():
     """47. Bleichenbacher's PKCS 1.5 Padding Oracle (Simple Case)
@@ -798,8 +780,7 @@ does not work well in practice*
 
 
 if __name__ == '__main__':
-    #for f in (cc41, cc42, cc43, cc44, cc45, cc46, cc47, cc48):
-    for f in (cc46, cc47, cc48):
+    for f in (cc41, cc42, cc43, cc44, cc45, cc46, cc47, cc48):
         print f.__doc__.split('\n')[0]
         f()
         print
