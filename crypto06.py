@@ -754,18 +754,15 @@ trying to grok how the math works.
         e, n = pubkey
         B = 2 ** (8 * (k-2))
         c0, si = c, 1 #skip blinding (step 1)
-        #M = [set([(2 * B, 3 * B - 1)])]
         Mi = set([(2 * B, 3 * B - 1)])
         i = 1
         while True:
+            #print i, Mi
             Mi_1 = Mi
             si_1 = si
             if i == 1:
                 #2.a
                 si = n / (3 * B)
-                #DEBUG LOSE THIS
-                si = 69357
-                print 'DEBUG si:', si
                 while not fcrypt(c0 * pow(si, e, n) % n):
                     si += 1
                 print '2.a found si:', si
@@ -790,9 +787,17 @@ trying to grok how the math works.
 
             #3
             Mi = set()
-
-            #break
-
+            print '3 Mi_1:', Mi_1
+            for a, b in Mi_1:
+                r = (a * si - 3 * B + 1) / n
+                r_hi = (b * si - 2 * B) / n
+                fsi = float(si)
+                while r <= r_hi:
+                    lo = max(a, int(math.ceil((2 * B + r * n) / fsi)))
+                    hi = min(b, int(math.floor((3 * B - 1 + r * n) / fsi)))
+                    Mi.add((lo,hi))
+                    r += 1
+            print '3 Mi:', Mi
             #4
             if len(Mi) == 1:
                 a, b = list(Mi)[0]
@@ -808,9 +813,9 @@ trying to grok how the math works.
     msg = "kick it, CC"
     bits = 256
     k = bits/8
-    #pubkey, privkey = rsa_genkeys(bits=bits, e=3)
-    pubkey = (3, 89943507979383075472115286569058914578384751154000263983274631453373869808129L)
-    privkey = (59962338652922050314743524379372609718522074798827326746601367971340364097923L, 89943507979383075472115286569058914578384751154000263983274631453373869808129L)
+    pubkey, privkey = rsa_genkeys(bits=bits, e=3)
+    #pubkey = (3, 89943507979383075472115286569058914578384751154000263983274631453373869808129L)
+    #privkey = (59962338652922050314743524379372609718522074798827326746601367971340364097923L, 89943507979383075472115286569058914578384751154000263983274631453373869808129L)
     fcrypt = partial(padding_oracle, k, privkey)
     pmsg = pkcs_pad(k, msg)
     print repr(pmsg)
