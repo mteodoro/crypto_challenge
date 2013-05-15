@@ -750,6 +750,61 @@ trying to grok how the math works.
         return ''.join(['\x00\x02', pad, '\x00', m])
 
 
+    def bleichencrack(fcrypt, k, pubkey, c):
+        e, n = pubkey
+        B = 2 ** (8 * (k-2))
+        c0, si = c, 1 #skip blinding (step 1)
+        #M = [set([(2 * B, 3 * B - 1)])]
+        Mi = set([(2 * B, 3 * B - 1)])
+        i = 1
+        while True:
+            Mi_1 = Mi
+            si_1 = si
+            if i == 1:
+                #2.a
+                si = n / (3 * B)
+                #DEBUG LOSE THIS
+                si = 69357
+                print 'DEBUG si:', si
+                while not fcrypt(c0 * pow(si, e, n) % n):
+                    si += 1
+                print '2.a found si:', si
+            elif len(Mi_1) > 1:
+                #2.b
+                si = si_1 + 1
+                while not fcrypt(c0 * pow(si, e, n) % n):
+                    si += 1
+                print '2.b found si:', si
+            else:
+                #2.c
+                a, b = list(Mi_1)[0]
+                ri = 2 * ((b * si_1 - 2 * B) / n)
+                while True:
+                    si = (2 * B + ri * n) / b
+                    si_hi = (3 * B + ri * n) / a
+                    while si < si_hi:
+                        if fcrypt(c0 * pow(si, e, n) % n):
+                            print '2.c found si:', si
+                            break
+                    ri += 1
+
+            #3
+            Mi = set()
+
+            #break
+
+            #4
+            if len(Mi) == 1:
+                a, b = list(Mi)[0]
+                if a == b:
+                    #we're done
+                    #return m
+                    return 'Found it!'
+
+            #try again
+            i += 1
+
+
     msg = "kick it, CC"
     bits = 256
     k = bits/8
@@ -761,42 +816,9 @@ trying to grok how the math works.
     print repr(pmsg)
     c = rsa_encrypt(pmsg, *pubkey)
 
-    e, n = pubkey
-    B = 2 ** (8 * (k-2))
-    c0 = c #skip blinding (step 1)
-    M = [(2 * B, 3 * B - 1)]
-    i = 1
-
-    while True:
-        if i == 1:
-            #2.a
-            s = n / (3 * B)
-            #DEBUG LOSE THIS
-            s = 69357
-            print 'DEBUG s:', s
-            while not fcrypt(c * pow(s, e, n) % n):
-                s += 1
-            print 'Found s:', s
-
-        elif i > 1 and len(M[i-1]) > 1:
-            #2.b
-            pass
-
-        else:
-            #2.c
-            pass
-
-        #3
-
-
-        break
-        #4
-        if len(M[i]) == 1 and M[i][0][0] == M[i][0][1]:
-            #we're done
-            break
-
-        #try again
-        i += 1
+    pm = bleichencrack(fcrypt, k, pubkey, c)
+    print repr(pm)
+    print 'Match:', pm == pmsg
 
 
 def cc48():
