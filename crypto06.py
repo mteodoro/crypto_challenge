@@ -67,7 +67,8 @@ def rsa_decrypt(c, d, n):
 
 def rsa_genkeys(bits, e):
     bits = bits / 2
-    p, q = getStrongPrime(bits, e), getStrongPrime(bits, e)
+    #p, q = getStrongPrime(bits, e), getStrongPrime(bits, e)
+    p, q = 31, 47
     n = p * q
     et = (p-1) * (q-1)
     d = invmod(e, et)
@@ -636,7 +637,9 @@ Decrypt the string (after encrypting it to a hidden private key, duh) above.
         return rsa_decrypt_long(c, *privkey) & 1
 
 
-    pubkey, privkey = rsa_genkeys(bits=1024, e=3)
+    #pubkey, privkey = rsa_genkeys(bits=1024, e=3)
+    pubkey, privkey = rsa_genkeys(bits=1024, e=779)
+    print pubkey, privkey
     #pubkey, privkey = (101, 203), (5, 203)
     fcrypt = partial(parity_oracle, privkey)
     msg = 'VGhhdCdzIHdoeSBJIGZvdW5kIHlvdSBkb24ndCBwbGF5IGFyb3VuZCB3aXRoIHRoZSBGdW5reSBDb2xkIE1lZGluYQ=='
@@ -644,21 +647,26 @@ Decrypt the string (after encrypting it to a hidden private key, duh) above.
     msg = 'abcdefghijklmnopqrstuvwxyz'
     #msg = '\x00\x01\x02\x03\x04\x05\x06\x06\x08\x09\x10'
     msg = bytes_to_long(msg)
-    #msg = 5
+    msg = 999
     print 'msg:', bin(msg)
     c = rsa_encrypt_long(msg, *pubkey)
+    print c
 
     e, n = pubkey
     lo, hi = 0, n
-    #while lo < hi:
-    for _ in xrange(int(math.log(n, 2))):
-        m = (hi + lo) // 2
+    i = 0
+    while lo < hi-1:
+    #for _ in xrange(int(math.log(n, 2))):
+        c = (c * pow(2, e, n)) % n
+        m = (hi + lo) / 2
         if fcrypt(c):
+            print i, 'odd lo',
             lo = m
         else:
+            print i, 'eve hi',
             hi = m
-        c = (c * pow(2, e, n)) % n
         print hi, repr(long_to_bytes(hi))
+        i += 1
 
     print 'hi ', hi
     print 'msg', msg
