@@ -12,7 +12,7 @@ import time
 import Crypto.Hash.SHA as SHA
 import Crypto.PublicKey.RSA as RSA
 import Crypto.Signature.PKCS1_v1_5 as PKCS1_v1_5
-from Crypto.Util.number import bytes_to_long, long_to_bytes, getStrongPrime
+from Crypto.Util.number import bytes_to_long, long_to_bytes, getPrime, getStrongPrime, GCD
 
 
 random.seed('matasano') #for reproducibility - will work with any seed
@@ -68,9 +68,15 @@ def rsa_decrypt(c, d, n):
 
 def rsa_genkeys(bits, e):
     bits = bits / 2
-    p, q = getStrongPrime(bits, e), getStrongPrime(bits, e)
+    et = e
+    while GCD(e, et) != 1:
+        if bits < 512:
+            p, q = getPrime(bits), getPrime(bits)
+        else:
+            p, q = getStrongPrime(bits, e), getStrongPrime(bits, e)
+        et = (p-1) * (q-1)
+
     n = p * q
-    et = (p-1) * (q-1)
     d = invmod(e, et)
     return (e,n), (d,n)
 
@@ -730,6 +736,13 @@ We recommend you just use the raw math from paper (check, check,
 double check your translation to code) and not spend too much time
 trying to grok how the math works.
 """
+    def padding_oracle(privkey, c):
+        m = rsa_decrypt(c, *privkey)
+        return m[:2] == '\x00\x02'
+
+
+    pubkey, privkey = rsa_genkeys(bits=256, e=3)
+    print pubkey, privkey
 
 
 def cc48():
