@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import binascii
+from decimal import Decimal, getcontext
 from fractions import Fraction
 from functools import partial
 import hashlib
@@ -651,7 +652,7 @@ Decrypt the string (after encrypting it to a hidden private key, duh) above.
     e, n = pubkey
     lo, hi = Fraction(0), Fraction(n)
     for _ in xrange(int(math.log(n, 2))+1):
-        c = (c * pow(2, e, n)) % n
+        c = c * pow(2, e, n)
         m = (lo + hi) / 2
         if fcrypt(c):
             lo = m
@@ -757,57 +758,72 @@ trying to grok how the math works.
         Mi = set([(2 * B, 3 * B - 1)])
         i = 1
         while True:
-            #print i, Mi
+            print i
             Mi_1 = Mi
             si_1 = si
             if i == 1:
-                #2.a
+                print '2.a'
                 si = n / (3 * B)
-                while not fcrypt(c0 * pow(si, e, n) % n):
+                while not fcrypt(c0 * pow(si, e, n)):
                     si += 1
                 print '2.a found si:', si
             elif len(Mi_1) > 1:
-                #2.b
+                print '2.b'
                 si = si_1 + 1
-                while not fcrypt(c0 * pow(si, e, n) % n):
+                while not fcrypt(c0 * pow(si, e, n)):
                     si += 1
                 print '2.b found si:', si
             else:
-                #2.c
+                print '2.c'
                 a, b = list(Mi_1)[0]
                 ri = 2 * ((b * si_1 - 2 * B) / n)
-                while True:
+                found = False
+                while not found:
+                #while True:
                     si = (2 * B + ri * n) / b
                     si_hi = (3 * B + ri * n) / a
-                    while si < si_hi:
-                        if fcrypt(c0 * pow(si, e, n) % n):
+                    print '2c si', si, 'si_hi', si_hi
+                    while si <= si_hi:
+                        if fcrypt(c0 * pow(si, e, n)):
                             print '2.c found si:', si
+                            found = True
                             break
+                        si += 1
                     ri += 1
 
             #3
             Mi = set()
-            print '3 Mi_1:', Mi_1
+            print '3 Mi_1:', sorted(Mi_1)
             for a, b in Mi_1:
-                r = (a * si - 3 * B + 1) / n
-                r_hi = (b * si - 2 * B) / n
-                fsi = float(si)
-                while r <= r_hi:
-                    lo = max(a, int(math.ceil((2 * B + r * n) / fsi)))
-                    hi = min(b, int(math.floor((3 * B - 1 + r * n) / fsi)))
-                    Mi.add((lo,hi))
+                #r = (a * si - 3 * B + 1) / n
+                r, mod = divmod(a * si - 3 * B + 1, n)
+                if mod:
                     r += 1
-            print '3 Mi:', Mi
+                r_hi = (b * si - 2 * B) / n
+                print '3 r:', r, 'r_hi:', r_hi
+                while r <= r_hi:
+                    lo, mod = divmod(2 * B + r * n, si)
+                    if mod:
+                        lo += 1
+                    lo = max(a, lo)
+                    hi = min(b, divmod(3 * B - 1 + r * n, si)[0])
+                    Mi.add((lo,hi))
+                    print '  Mi+', lo, hi
+                    r += 1
+            #print '3 Mi:', sorted(Mi)
+
             #4
             if len(Mi) == 1:
                 a, b = list(Mi)[0]
                 if a == b:
-                    #we're done
-                    #return m
-                    return 'Found it!'
+                    m = long_to_bytes(a)
+                    m = '\x00' * (k - len(m)) + m
+                    print '4 found', m
+                    return m
 
             #try again
             i += 1
+            print
 
 
     msg = "kick it, CC"
