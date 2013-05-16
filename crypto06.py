@@ -140,6 +140,95 @@ def dsa_recover_x(q, h, sig, k):
     return (((s * k) - h) * invmod(r, q) % q)
 
 
+def padding_oracle(k, privkey, c):
+    m = rsa_decrypt(c, *privkey)
+    m = '\x00' * (k - len(m)) + m #I2OSP
+    return m[:2] == '\x00\x02'
+
+
+def pkcs_pad(k, m):
+    if len(m) > k - 11:
+        raise Exception('m is too long')
+    plen = k - len(m) - 3
+    pad = ''.join(chr(random.randint(1, 255)) for _ in xrange(plen))
+    return ''.join(['\x00\x02', pad, '\x00', m])
+
+
+def bleichencrack(fcrypt, k, pubkey, c):
+    e, n = pubkey
+    B = 2 ** (8 * (k-2))
+    c0, si = c, 1 #skip blinding (step 1)
+    Mi = set([(2 * B, 3 * B - 1)])
+    i = 1
+    while True:
+        print i
+        Mi_1 = Mi
+        si_1 = si
+        if i == 1:
+            print '2.a'
+            si = n / (3 * B)
+            while not fcrypt(c0 * pow(si, e, n)):
+                si += 1
+            print '2.a found si:', si
+        elif len(Mi_1) > 1:
+            print '2.b'
+            si = si_1 + 1
+            while not fcrypt(c0 * pow(si, e, n)):
+                si += 1
+            print '2.b found si:', si
+        else:
+            print '2.c'
+            a, b = list(Mi_1)[0]
+            ri = 2 * ((b * si_1 - 2 * B) / n)
+            found = False
+            while not found:
+            #while True:
+                si = (2 * B + ri * n) / b
+                si_hi = (3 * B + ri * n) / a
+                print '2c si', si, 'si_hi', si_hi
+                while si <= si_hi:
+                    if fcrypt(c0 * pow(si, e, n)):
+                        print '2.c found si:', si
+                        found = True
+                        break
+                    si += 1
+                ri += 1
+
+        #3
+        Mi = set()
+        print '3 Mi_1:', sorted(Mi_1)
+        for a, b in Mi_1:
+            #r = (a * si - 3 * B + 1) / n
+            r, mod = divmod(a * si - 3 * B + 1, n)
+            if mod:
+                r += 1
+            r_hi = (b * si - 2 * B) / n
+            print '3 r:', r, 'r_hi:', r_hi
+            while r <= r_hi:
+                lo, mod = divmod(2 * B + r * n, si)
+                if mod:
+                    lo += 1
+                lo = max(a, lo)
+                hi = min(b, divmod(3 * B - 1 + r * n, si)[0])
+                Mi.add((lo,hi))
+                print '  Mi+', lo, hi
+                r += 1
+        #print '3 Mi:', sorted(Mi)
+
+        #4
+        if len(Mi) == 1:
+            a, b = list(Mi)[0]
+            if a == b:
+                m = long_to_bytes(a)
+                m = '\x00' * (k - len(m)) + m
+                print '4 found', m
+                return m
+
+        #try again
+        i += 1
+        print
+
+
 def cc41():
     """41. Implement Unpadded Message Recovery Oracle
 
@@ -737,101 +826,10 @@ We recommend you just use the raw math from paper (check, check,
 double check your translation to code) and not spend too much time
 trying to grok how the math works.
 """
-    def padding_oracle(k, privkey, c):
-        m = rsa_decrypt(c, *privkey)
-        m = '\x00' * (k - len(m)) + m #I2OSP
-        return m[:2] == '\x00\x02'
-
-
-    def pkcs_pad(k, m):
-        if len(m) > k - 11:
-            raise Exception('m is too long')
-        plen = k - len(m) - 3
-        pad = ''.join(chr(random.randint(1, 255)) for _ in xrange(plen))
-        return ''.join(['\x00\x02', pad, '\x00', m])
-
-
-    def bleichencrack(fcrypt, k, pubkey, c):
-        e, n = pubkey
-        B = 2 ** (8 * (k-2))
-        c0, si = c, 1 #skip blinding (step 1)
-        Mi = set([(2 * B, 3 * B - 1)])
-        i = 1
-        while True:
-            print i
-            Mi_1 = Mi
-            si_1 = si
-            if i == 1:
-                print '2.a'
-                si = n / (3 * B)
-                while not fcrypt(c0 * pow(si, e, n)):
-                    si += 1
-                print '2.a found si:', si
-            elif len(Mi_1) > 1:
-                print '2.b'
-                si = si_1 + 1
-                while not fcrypt(c0 * pow(si, e, n)):
-                    si += 1
-                print '2.b found si:', si
-            else:
-                print '2.c'
-                a, b = list(Mi_1)[0]
-                ri = 2 * ((b * si_1 - 2 * B) / n)
-                found = False
-                while not found:
-                #while True:
-                    si = (2 * B + ri * n) / b
-                    si_hi = (3 * B + ri * n) / a
-                    print '2c si', si, 'si_hi', si_hi
-                    while si <= si_hi:
-                        if fcrypt(c0 * pow(si, e, n)):
-                            print '2.c found si:', si
-                            found = True
-                            break
-                        si += 1
-                    ri += 1
-
-            #3
-            Mi = set()
-            print '3 Mi_1:', sorted(Mi_1)
-            for a, b in Mi_1:
-                #r = (a * si - 3 * B + 1) / n
-                r, mod = divmod(a * si - 3 * B + 1, n)
-                if mod:
-                    r += 1
-                r_hi = (b * si - 2 * B) / n
-                print '3 r:', r, 'r_hi:', r_hi
-                while r <= r_hi:
-                    lo, mod = divmod(2 * B + r * n, si)
-                    if mod:
-                        lo += 1
-                    lo = max(a, lo)
-                    hi = min(b, divmod(3 * B - 1 + r * n, si)[0])
-                    Mi.add((lo,hi))
-                    print '  Mi+', lo, hi
-                    r += 1
-            #print '3 Mi:', sorted(Mi)
-
-            #4
-            if len(Mi) == 1:
-                a, b = list(Mi)[0]
-                if a == b:
-                    m = long_to_bytes(a)
-                    m = '\x00' * (k - len(m)) + m
-                    print '4 found', m
-                    return m
-
-            #try again
-            i += 1
-            print
-
-
     msg = "kick it, CC"
     bits = 256
     k = bits/8
     pubkey, privkey = rsa_genkeys(bits=bits, e=3)
-    #pubkey = (3, 89943507979383075472115286569058914578384751154000263983274631453373869808129L)
-    #privkey = (59962338652922050314743524379372609718522074798827326746601367971340364097923L, 89943507979383075472115286569058914578384751154000263983274631453373869808129L)
     fcrypt = partial(padding_oracle, k, privkey)
     pmsg = pkcs_pad(k, msg)
     print repr(pmsg)
@@ -887,6 +885,19 @@ out to 's' values by solving m1=m0s1-rn for 's' instead of 'r' or
 'm0'. So much algebra! Make your teenage son do it for you! *Note:
 does not work well in practice*
 """
+    msg = "kick it, CC"
+    bits = 768
+    k = bits/8
+    pubkey, privkey = rsa_genkeys(bits=bits, e=3)
+    fcrypt = partial(padding_oracle, k, privkey)
+    pmsg = pkcs_pad(k, msg)
+    print repr(pmsg)
+    c = rsa_encrypt(pmsg, *pubkey)
+
+    pm = bleichencrack(fcrypt, k, pubkey, c)
+    print repr(pm)
+    print 'Match:', pm == pmsg
+
 
 
 if __name__ == '__main__':
