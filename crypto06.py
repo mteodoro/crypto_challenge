@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import binascii
-from decimal import Decimal, getcontext
 from fractions import Fraction
 from functools import partial
 import hashlib
@@ -15,8 +14,7 @@ import Crypto.PublicKey.RSA as RSA
 import Crypto.Signature.PKCS1_v1_5 as PKCS1_v1_5
 from Crypto.Util.number import bytes_to_long, long_to_bytes, getPrime, getStrongPrime, GCD
 
-
-random.seed('matasano') #for reproducibility - will work with any seed
+#random.seed('matasano') #for reproducibility - will work with any seed
 
 
 #http://docs.python.org/2/library/itertools.html#recipes
@@ -72,6 +70,7 @@ def rsa_genkeys(bits, e):
     et = e
     while GCD(e, et) != 1:
         if bits < 512:
+            #getStrongPrime won't accept bits < 512
             p, q = getPrime(bits), getPrime(bits)
         else:
             p, q = getStrongPrime(bits, e), getStrongPrime(bits, e)
@@ -157,53 +156,46 @@ def pkcs_pad(k, m):
 def bleichencrack(fcrypt, k, pubkey, c):
     e, n = pubkey
     B = 2 ** (8 * (k-2))
-    c0, si = c, 1 #skip blinding (step 1)
     Mi = set([(2 * B, 3 * B - 1)])
-    i = 1
-    while True:
-        print i
+    c0, si = c, 1 #skip blinding (step 1)
+    for i in itertools.count(1):
         Mi_1 = Mi
         si_1 = si
         if i == 1:
-            print '2.a'
+            #2.a
             si = n / (3 * B)
             while not fcrypt(c0 * pow(si, e, n)):
                 si += 1
-            print '2.a found si:', si
+            #print '%s 2.a si: %s' % (i, si)
         elif len(Mi_1) > 1:
-            print '2.b'
+            #2.b
             si = si_1 + 1
             while not fcrypt(c0 * pow(si, e, n)):
                 si += 1
-            print '2.b found si:', si
+            #print '%s 2.b si: %s' % (i, si)
         else:
-            print '2.c'
+            #2.c
             a, b = list(Mi_1)[0]
             ri = 2 * ((b * si_1 - 2 * B) / n)
             found = False
             while not found:
-            #while True:
                 si = (2 * B + ri * n) / b
                 si_hi = (3 * B + ri * n) / a
-                print '2c si', si, 'si_hi', si_hi
                 while si <= si_hi:
                     if fcrypt(c0 * pow(si, e, n)):
-                        print '2.c found si:', si
                         found = True
                         break
                     si += 1
                 ri += 1
+            #print '%s 2.b si: %s' % (i, si)
 
         #3
         Mi = set()
-        print '3 Mi_1:', sorted(Mi_1)
         for a, b in Mi_1:
-            #r = (a * si - 3 * B + 1) / n
             r, mod = divmod(a * si - 3 * B + 1, n)
             if mod:
                 r += 1
             r_hi = (b * si - 2 * B) / n
-            print '3 r:', r, 'r_hi:', r_hi
             while r <= r_hi:
                 lo, mod = divmod(2 * B + r * n, si)
                 if mod:
@@ -211,9 +203,8 @@ def bleichencrack(fcrypt, k, pubkey, c):
                 lo = max(a, lo)
                 hi = min(b, divmod(3 * B - 1 + r * n, si)[0])
                 Mi.add((lo,hi))
-                print '  Mi+', lo, hi
                 r += 1
-        #print '3 Mi:', sorted(Mi)
+        #print '%s 3 Mi: %s' % (i, Mi)
 
         #4
         if len(Mi) == 1:
@@ -221,12 +212,7 @@ def bleichencrack(fcrypt, k, pubkey, c):
             if a == b:
                 m = long_to_bytes(a)
                 m = '\x00' * (k - len(m)) + m
-                print '4 found', m
                 return m
-
-        #try again
-        i += 1
-        print
 
 
 def cc41():
@@ -832,11 +818,11 @@ trying to grok how the math works.
     pubkey, privkey = rsa_genkeys(bits=bits, e=3)
     fcrypt = partial(padding_oracle, k, privkey)
     pmsg = pkcs_pad(k, msg)
-    print repr(pmsg)
+    print 'Padded msg:', repr(pmsg)
     c = rsa_encrypt(pmsg, *pubkey)
 
     pm = bleichencrack(fcrypt, k, pubkey, c)
-    print repr(pm)
+    print 'Recovered: ', repr(pm)
     print 'Match:', pm == pmsg
 
 
@@ -891,18 +877,16 @@ does not work well in practice*
     pubkey, privkey = rsa_genkeys(bits=bits, e=3)
     fcrypt = partial(padding_oracle, k, privkey)
     pmsg = pkcs_pad(k, msg)
-    print repr(pmsg)
+    print 'Padded msg:', repr(pmsg)
     c = rsa_encrypt(pmsg, *pubkey)
 
     pm = bleichencrack(fcrypt, k, pubkey, c)
-    print repr(pm)
+    print 'Recovered: ', repr(pm)
     print 'Match:', pm == pmsg
 
 
-
 if __name__ == '__main__':
-    #for f in (cc41, cc42, cc43, cc44, cc45, cc46, cc47, cc48):
-    for f in (cc47, cc48):
+    for f in (cc41, cc42, cc43, cc44, cc45, cc46, cc47, cc48):
         print f.__doc__.split('\n')[0]
         f()
         print
