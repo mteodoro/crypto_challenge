@@ -1,4 +1,23 @@
 #!/usr/bin/env python
+from functools import partial
+import random
+
+from Crypto.Cipher import AES
+
+random.seed('matasano')
+
+
+def random_key(keylen):
+    return ''.join(chr(random.randint(0,255)) for _ in xrange(keylen))
+
+
+def pkcs7_pad(blocklen, data):
+    padlen = blocklen - len(data) % blocklen
+    return data + chr(padlen) * padlen
+
+
+def xor_block(b1, b2):
+    return ''.join(chr(ord(x) ^ ord(y)) for x,y in zip(b1, b2))
 
 
 def cc49():
@@ -101,6 +120,46 @@ Food for thought:
 
  How would you modify the protocol to prevent this?
 """
+
+    def cbc_mac_sign(key, msg, iv):
+        return AES.new(key, mode=AES.MODE_CBC, IV=iv).encrypt(pkcs7_pad(16, msg))[-16:]
+
+    def cbc_mac_validate(key, msg, iv, mac):
+        return cbc_mac_sign(key, msg, iv) == mac
+
+    key = random_key(16)
+    fsign = partial(cbc_mac_sign, key)
+    fvalidate = partial(cbc_mac_validate, key)
+
+    def build_request(frm, to, amount):
+        msg = "from=%s&to=%s&amount=%s" % (frm, to, amount)
+        iv = random_key(16)
+        mac = fsign(msg, iv)
+        return msg, iv, mac
+
+    print "Part 1:"
+    print 'Generate valid client request for SB1M with A.Takr in from/to:'
+
+    msg, iv, mac = build_request('A.Takr', 'A.Takr', 'SB1M')
+
+    print '  Msg:', msg
+    print '  IV :', iv.encode('hex')
+    print '  MAC:', mac.encode('hex')
+    print '  Valid: ', fvalidate(msg, iv, mac)
+    print
+
+    print "Forge 1st block of message and update IV to match"
+    print "so that forged message validates with same MAC:"
+
+    badblock = "from=V.Ictm&to=A"
+    badmsg = badblock + msg[16:]
+    badiv = xor_block(xor_block(msg[:16], iv), badblock)
+
+    print '  Msg:', badmsg
+    print '  IV :', badiv.encode('hex')
+    print '  MAC:', mac.encode('hex')
+    print '  Valid: ', fvalidate(badmsg, badiv, mac)
+    print
 
 
 def cc50():
