@@ -20,6 +20,14 @@ def xor_block(b1, b2):
     return ''.join(chr(ord(x) ^ ord(y)) for x,y in zip(b1, b2))
 
 
+def cbc_mac_sign(key, iv, msg):
+    return AES.new(key, mode=AES.MODE_CBC, IV=iv).encrypt(pkcs7_pad(16, msg))[-16:]
+
+
+def cbc_mac_validate(key, iv, msg, mac):
+    return cbc_mac_sign(key, iv, msg) == mac
+
+
 def cc49():
     """49. CBC-MAC Message Forgery
 
@@ -120,13 +128,6 @@ Food for thought:
 
  How would you modify the protocol to prevent this?
 """
-
-    def cbc_mac_sign(key, msg, iv):
-        return AES.new(key, mode=AES.MODE_CBC, IV=iv).encrypt(pkcs7_pad(16, msg))[-16:]
-
-    def cbc_mac_validate(key, msg, iv, mac):
-        return cbc_mac_sign(key, msg, iv) == mac
-
     key = random_key(16)
     fsign = partial(cbc_mac_sign, key)
     fvalidate = partial(cbc_mac_validate, key)
@@ -134,10 +135,10 @@ Food for thought:
     def build_request(frm, to, amount):
         msg = "from=%s&to=%s&amount=%s" % (frm, to, amount)
         iv = random_key(16)
-        mac = fsign(msg, iv)
+        mac = fsign(iv, msg)
         return msg, iv, mac
 
-    print "Part 1:"
+    print "Part 1 - block forgery:"
     print 'Generate valid client request for SB1M with A.Takr in from/to:'
 
     msg, iv, mac = build_request('A.Takr', 'A.Takr', 'SB1M')
@@ -145,7 +146,7 @@ Food for thought:
     print '  Msg:', msg
     print '  IV :', iv.encode('hex')
     print '  MAC:', mac.encode('hex')
-    print '  Valid: ', fvalidate(msg, iv, mac)
+    print '  Valid:', fvalidate(iv, msg, mac)
     print
 
     print "Forge 1st block of message and update IV to match"
@@ -158,8 +159,38 @@ Food for thought:
     print '  Msg:', badmsg
     print '  IV :', badiv.encode('hex')
     print '  MAC:', mac.encode('hex')
-    print '  Valid: ', fvalidate(badmsg, badiv, mac)
+    print '  Valid:', fvalidate(badiv, badmsg, mac)
     print
+
+
+    print "Part 2 - length extension:"
+
+    iv = '\0' * 16
+    fsign = partial(cbc_mac_sign, key, iv)
+    fvalidate = partial(cbc_mac_validate, key, iv)
+
+    def build_request(frm, tx_list):
+        tx_list = ';'.join('%s:%s' % (to, amt) for to, amt in tx_list)
+        msg = "from=%s&tx_list=%s" % (frm, tx_list)
+        mac = fsign(msg)
+        return msg, mac
+
+    print "Capture valid client request and MAC:"
+    msg, mac = build_request('V.Ictm', [('Alice', 'SB5000')])
+    msg = 'A' * 32
+    mac = fsign(msg)
+    print '  Msg:', msg
+    print '  MAC:', mac.encode('hex')
+    print '  Valid:', fvalidate(msg, mac)
+
+
+    badext = ";A.Takr:SB1M"
+    badext = 'B' * 12
+
+    badmsg = msg + badext
+    print badmsg, len(badmsg)
+
+
 
 
 def cc50():
@@ -194,6 +225,9 @@ BONUS:
  Write JavaScript code that downloads your file, checks its CBC-MAC,
  and inserts it into the DOM iff it matches the expected hash.
 """
+    test = "296b8d7cb78a243dda4d0a61d33bbdd1"
+    mac = cbc_mac_sign("YELLOW SUBMARINE", '\0' * 16, "alert('MZA who was that?');\n").encode('hex')
+    print '%s: %s' % (mac, 'Match' if test == mac else 'No Match')
 
 
 def cc51():
@@ -613,7 +647,8 @@ decrypt the cookie.
 
 
 if __name__ == '__main__':
-    for f in (cc49, cc50, cc51, cc52, cc53, cc54, cc55, cc56):
+    #for f in (cc49, cc50, cc51, cc52, cc53, cc54, cc55, cc56):
+    for f in (cc49, cc50):
         print f.__doc__.split('\n')[0]
         f()
         print
