@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 from functools import partial
 import random
+import zlib
 
 from Crypto.Cipher import AES
+from Crypto.Util import Counter
 
 random.seed('matasano')
 
@@ -326,6 +328,36 @@ Got it? Great.
 
 Now swap out your stream cipher for CBC and do it again.
 """
+    def ctr_encrypt(data):
+        key = random_key(16)
+        ctr = Counter.new(128)
+        return AES.new(key, mode=AES.MODE_CTR, counter=ctr).encrypt(data)
+
+    def cbc_encrypt(data):
+        key = random_key(16)
+        iv = random_key(16)
+        return AES.new(key, mode=AES.MODE_CBC, IV=iv).encrypt(pkcs7_pad(16, data))
+
+    def compression_oracle(fenc, P):
+        request = """POST / HTTP/1.1
+Host: hapless.com
+Cookie: sessionid=TmV2ZXIgcmV2ZWFsIHRoZSBXdS1UYW5nIFNlY3JldCE=
+Content-Length: %s
+
+%s"""
+        r = request % (len(P), P)
+        r = zlib.compress(r)
+        r = fenc(r)
+        return len(r)
+
+    ctr_oracle = partial(compression_oracle, ctr_encrypt)
+    x = ctr_oracle('sessionid=')
+    print x
+
+    cbc_oracle = partial(compression_oracle, cbc_encrypt)
+    x = cbc_oracle('sessionid=')
+    print x
+
 
 
 def cc52():
@@ -669,7 +701,7 @@ decrypt the cookie.
 
 if __name__ == '__main__':
     #for f in (cc49, cc50, cc51, cc52, cc53, cc54, cc55, cc56):
-    for f in (cc49, cc50):
+    for f in (cc51,):
         print f.__doc__.split('\n')[0]
         f()
         print
