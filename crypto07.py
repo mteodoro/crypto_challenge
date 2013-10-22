@@ -225,9 +225,30 @@ BONUS:
  Write JavaScript code that downloads your file, checks its CBC-MAC,
  and inserts it into the DOM iff it matches the expected hash.
 """
-    test = "296b8d7cb78a243dda4d0a61d33bbdd1"
-    mac = cbc_mac_sign("YELLOW SUBMARINE", '\0' * 16, "alert('MZA who was that?');\n").encode('hex')
-    print '%s: %s' % (mac, 'Match' if test == mac else 'No Match')
+    key = "YELLOW SUBMARINE"
+    iv = '\0' * 16
+    msg = "alert('MZA who was that?');\n"
+
+    #make sure it works
+    mac = cbc_mac_sign(key, iv, msg).encode('hex')
+    print '%s: %s' % (mac, repr(msg))
+
+    #encrypt our prefix and break it into blocks
+    prefix = "alert('Ayo, the Wu is back!');//"
+    prefix_enc = AES.new(key, mode=AES.MODE_CBC, IV=iv).encrypt(prefix)
+    p1 = prefix_enc[-16:]
+
+    #XOR last block of prefix_enc with 1st block of original msg
+    #and replace 1st block of original with that
+    m0 = xor_block(prefix_enc[-16:], msg[:16])
+
+    #put it together: prefix + glue block + rest of msg
+    forged_msg = prefix + m0 + msg[16:]
+    mac = cbc_mac_sign(key, iv, forged_msg).encode('hex')
+    print '%s: %s' % (mac, repr(forged_msg))
+
+    print
+    print "TODO: BONUS"
 
 
 def cc51():
