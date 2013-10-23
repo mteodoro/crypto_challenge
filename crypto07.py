@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 from collections import defaultdict
 from functools import partial
+import itertools
 import random
 import string
+import struct
 import sys
 import zlib
 
@@ -487,6 +489,48 @@ hash function to pair with the one you just used. Find a pair of
 messages that collide under both functions. Measure the total number
 of calls to the collision function.
 """
+    def build_hash(cb):
+        """build a hash with cb *bytes* of state"""
+        def hfunc(msg, h):
+            """hash a pre-padded msg with seed h"""
+            for i in xrange(0, len(msg), 16):
+                h = AES.new(pkcs7_pad(16, h), mode=AES.MODE_ECB).encrypt(msg[i:i+16])[:cb]
+            return h
+        return hfunc
+
+    def find_collisions(hfunc, h, n):
+        """generate 2^n collisions with hfunc starting at h"""
+        hcount = 0
+        pairs = []
+        while len(pairs) < n:
+            nh_msg = {}
+            while True:
+                #generate random blocks (no padding necessary)
+                msg = random_key(16)
+                nh = hfunc(msg, h)
+                hcount += 1
+                if nh in nh_msg:
+                    #print len(nh_msg), repr(nh), repr(nh_msg[nh]), repr(msg)
+                    pairs.append((nh_msg[nh], msg))
+                    h = nh
+                    break
+                nh_msg[nh] = msg
+        return hcount, [''.join(msg) for msg in itertools.product(*pairs)]
+
+    b = 16
+    cb = b / 8 #b in bytes
+    #seed with h0 from sha1 - why not?
+    h_init = struct.pack('<I', 0x67452301)[:cb]
+    f = build_hash(cb)
+
+    n = 3
+    expected = n * 2**(b / 2)
+    hcount, collisions = find_collisions(f, h_init, n)
+    h = f(collisions[0], h_init)
+    print "%d hashes to find %d values that collide to %d bit hash: %s (expected %d)" % (hcount, n**2, cb*8, repr(h), expected)
+    for msg in collisions:
+        print '  %s: %s' % (repr(f(msg, h_init)), repr(msg))
+    print
 
 
 def cc53():
@@ -746,7 +790,7 @@ decrypt the cookie.
 
 if __name__ == '__main__':
     #for f in (cc49, cc50, cc51, cc52, cc53, cc54, cc55, cc56):
-    for f in (cc49, cc50, cc51,):
+    for f in (cc52,):
         print f.__doc__.split('\n')[0]
         f()
         print
