@@ -170,7 +170,8 @@ Food for thought:
     print
 
 
-    print "Part 2 - length extension:"
+    print "TODO: Part 2 - length extension:"
+    return
 
     iv = '\0' * 16
     fsign = partial(cbc_mac_sign, key, iv)
@@ -498,39 +499,88 @@ of calls to the collision function.
             return h
         return hfunc
 
-    def find_collisions(hfunc, h, n):
-        """generate 2^n collisions with hfunc starting at h"""
-        hcount = 0
+    def gen_collisions(hfunc, h, n):
+        """generate up to 2^n collisions with hfunc starting at h"""
+        hcalls = 0
         pairs = []
         while len(pairs) < n:
-            nh_msg = {}
+            fh_msg = {}
             while True:
                 #generate random blocks (no padding necessary)
                 msg = random_key(16)
-                nh = hfunc(msg, h)
-                hcount += 1
-                if nh in nh_msg:
-                    #print len(nh_msg), repr(nh), repr(nh_msg[nh]), repr(msg)
-                    pairs.append((nh_msg[nh], msg))
-                    h = nh
+                fh = hfunc(msg, h)
+                hcalls += 1
+                if fh in fh_msg:
+                    #print len(fh_msg), repr(fh), repr(fh_msg[fh]), repr(msg)
+                    pairs.append((fh_msg[fh], msg))
+                    h = fh
                     break
-                nh_msg[nh] = msg
-        return hcount, [''.join(msg) for msg in itertools.product(*pairs)]
+                fh_msg[fh] = msg
+            yield len(pairs), hcalls, [''.join(msg) for msg in itertools.product(*pairs)]
 
+    #seed with chunks of h0 from sha1 - why not?
+    h0 = struct.pack('<I', 0x67452301)
+
+    #build 16-bit hash function f
     b = 16
     cb = b / 8 #b in bytes
-    #seed with h0 from sha1 - why not?
-    h_init = struct.pack('<I', 0x67452301)[:cb]
+    f_h = h0[:cb]
     f = build_hash(cb)
 
-    n = 3
+    #find n**2 collisions in f
+    n = 2
+    _, fcalls, collisions = list(gen_collisions(f, f_h, n))[-1]
+    h = f(collisions[0], f_h)
     expected = n * 2**(b / 2)
-    hcount, collisions = find_collisions(f, h_init, n)
-    h = f(collisions[0], h_init)
-    print "%d hashes to find %d values that collide to %d bit hash: %s (expected %d)" % (hcount, n**2, cb*8, repr(h), expected)
+    print "Test: found %d values that collide in %d-bit f() to: %s in %d calls (expected %d)" % (
+            2**n, b, repr(h), fcalls, expected)
     for msg in collisions:
-        print '  %s: %s' % (repr(f(msg, h_init)), repr(msg))
+        print '  %s: %s' % (repr(f(msg, f_h)), repr(msg))
     print
+
+
+    #build 24-bit hash function g
+    b = 24
+    cb = b / 8 #b in bytes
+    g_h = h0[:cb]
+    g = build_hash(cb)
+
+    #generate and test up to 2^16 f() collisions - hope to reach it near 2^12
+    gcalls = 0
+    found = False
+    for n, fcalls, collisions in gen_collisions(f, f_h, 16):
+        gh_msg = {}
+        for msg in collisions:
+            gh = g(msg, g_h)
+            gcalls += 1
+            if gh in gh_msg:
+                found = True
+                break
+            gh_msg[gh] = msg
+        if found:
+            break
+
+    if not found:
+        print "couldn't find a collision in both f() and g().  increase n?"
+        return
+
+    msg0 = gh_msg[gh]
+    msg1 = msg
+
+    print "Found collision in both 16-bit f() and 24-bit g():"
+    print 'msg0:', repr(msg0)
+    print
+    print 'msg1:', repr(msg1)
+    print
+    print 'f(msg0):', repr(f(msg0, f_h))
+    print 'f(msg1):', repr(f(msg1, f_h))
+    print
+    print 'g(msg0):', repr(g(msg0, g_h))
+    print 'g(msg1):', repr(g(msg1, g_h))
+    print
+    print 'f() calls:', fcalls
+    print 'g() calls:', gcalls
+    print 'n:', n
 
 
 def cc53():
@@ -790,7 +840,7 @@ decrypt the cookie.
 
 if __name__ == '__main__':
     #for f in (cc49, cc50, cc51, cc52, cc53, cc54, cc55, cc56):
-    for f in (cc52,):
+    for f in (cc49, cc50, cc51, cc52,):
         print f.__doc__.split('\n')[0]
         f()
         print
