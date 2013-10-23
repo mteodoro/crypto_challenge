@@ -1,6 +1,9 @@
 #!/usr/bin/env python
+from collections import defaultdict
 from functools import partial
 import random
+import string
+import sys
 import zlib
 
 from Crypto.Cipher import AES
@@ -350,14 +353,33 @@ Content-Length: %s
         r = fenc(r)
         return len(r)
 
-    ctr_oracle = partial(compression_oracle, ctr_encrypt)
-    x = ctr_oracle('sessionid=')
-    print x
+    def ctr_recover():
+        ctr_oracle = partial(compression_oracle, ctr_encrypt)
+        cookie = "Cookie: "
+        suffix = "\nContent-Length: "
+        hlen_strs = defaultdict(list)
+        working = ['']
+        while not cookie.endswith(suffix):
+            for c in string.printable:
+                for ws in working:
+                    hlen = ctr_oracle(cookie + ws + c)
+                    hlen_strs[hlen].append(ws + c)
 
-    cbc_oracle = partial(compression_oracle, cbc_encrypt)
-    x = cbc_oracle('sessionid=')
-    print x
+            #choose the best candidate(s)
+            candidates = hlen_strs[min(hlen_strs)]
+            hlen_strs.clear()
+            if len(candidates) == 1:
+                #only one - append it to cookie and reset working set
+                cookie += candidates[0]
+                working = ['']
+            else:
+                #use these in next round
+                working = candidates
+            #print cookie, working
+        return cookie
 
+    cookie = ctr_recover()
+    print 'CTR: Found cookie:', cookie.split()[1]
 
 
 def cc52():
