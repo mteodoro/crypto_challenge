@@ -341,7 +341,7 @@ Now swap out your stream cipher for CBC and do it again.
         iv = random_key(16)
         return AES.new(key, mode=AES.MODE_CBC, IV=iv).encrypt(pkcs7_pad(16, data))
 
-    def compression_oracle(fenc, P):
+    def compression_oracle(fencrypt, P):
         request = """POST / HTTP/1.1
 Host: hapless.com
 Cookie: sessionid=TmV2ZXIgcmV2ZWFsIHRoZSBXdS1UYW5nIFNlY3JldCE=
@@ -350,36 +350,59 @@ Content-Length: %s
 %s"""
         r = request % (len(P), P)
         r = zlib.compress(r)
-        r = fenc(r)
+        r = fencrypt(r)
         return len(r)
 
-    def ctr_recover():
-        ctr_oracle = partial(compression_oracle, ctr_encrypt)
-        cookie = "Cookie: "
-        suffix = "\nContent-Length: "
-        hlen_strs = defaultdict(list)
-        working = ['']
-        while not cookie.endswith(suffix):
+    #find the cookie using a CTR stream compression oracle
+    ctr_oracle = partial(compression_oracle, ctr_encrypt)
+    cookie = "Cookie: "
+    suffix = "\nContent-Length: "
+    hlen_strs = defaultdict(list)
+    working = ['']
+    while not cookie.endswith(suffix):
+        for c in string.printable:
+            for ws in working:
+                hlen = ctr_oracle(cookie + ws + c)
+                hlen_strs[hlen].append(ws + c)
+
+        #choose the best candidate(s)
+        working = hlen_strs[min(hlen_strs)]
+        hlen_strs.clear()
+        if len(working) == 1:
+            #only one - append it to cookie and reset working set
+            cookie += working[0]
+            working = ['']
+
+    print 'CTR: Found cookie:', cookie.split()[1]
+
+
+    #find the cookie using a CBC block compression oracle
+    cbc_oracle = partial(compression_oracle, cbc_encrypt)
+    cookie = "Cookie: "
+    suffix = "\nContent-Length: "
+    hlen_strs = defaultdict(list)
+    working = ['']
+    while not cookie.endswith(suffix):
+        pad = ''
+        #add random values to pad until oracle gives us
+        #lengths on both sides of a block boundary
+        while len(hlen_strs) < 2:
+            hlen_strs.clear()
             for c in string.printable:
                 for ws in working:
-                    hlen = ctr_oracle(cookie + ws + c)
+                    hlen = cbc_oracle(cookie + ws + c + pad)
                     hlen_strs[hlen].append(ws + c)
+            pad += random_key(1)
 
-            #choose the best candidate(s)
-            candidates = hlen_strs[min(hlen_strs)]
-            hlen_strs.clear()
-            if len(candidates) == 1:
-                #only one - append it to cookie and reset working set
-                cookie += candidates[0]
-                working = ['']
-            else:
-                #use these in next round
-                working = candidates
-            #print cookie, working
-        return cookie
+        #choose the best candidate(s)
+        working = hlen_strs[min(hlen_strs)]
+        hlen_strs.clear()
+        if len(working) == 1:
+            #only one - append it to cookie and reset working set
+            cookie += working[0]
+            working = ['']
 
-    cookie = ctr_recover()
-    print 'CTR: Found cookie:', cookie.split()[1]
+    print 'CBC: Found cookie:', cookie.split()[1]
 
 
 def cc52():
@@ -723,7 +746,7 @@ decrypt the cookie.
 
 if __name__ == '__main__':
     #for f in (cc49, cc50, cc51, cc52, cc53, cc54, cc55, cc56):
-    for f in (cc51,):
+    for f in (cc49, cc50, cc51,):
         print f.__doc__.split('\n')[0]
         f()
         print
