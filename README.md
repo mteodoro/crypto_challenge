@@ -1,7 +1,9 @@
-crypto_challenge
-================
-
 Matasano Crypto Challenge
+=========================
+
+Update: [17th to finish out of ~4800!](https://twitter.com/tqbf/status/335388966876483586)
+--------------------------------------
+
 
 http://www.matasano.com/articles/crypto-challenges/
 
